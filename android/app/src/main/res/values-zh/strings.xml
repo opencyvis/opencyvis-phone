@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vd_btn_back">返回</string>
+    <string name="vd_btn_minimize">最小化</string>
+    <string name="vd_btn_take_over">接管</string>
+    <string name="vd_btn_return_control">退出接管</string>
+    <string name="vd_btn_stop">停止</string>
+    <string name="vd_hint_answer">请输入回答...</string>
+    <string name="vd_cd_minimize">最小化到悬浮窗</string>
+    <string name="handoff_title">需要你接管输入</string>
+    <string name="handoff_active_message">请在设备上完成敏感输入。Agent 不会读取或保存你输入的内容。</string>
+    <string name="handoff_pending_message">将在 %1$d 秒后交还给 agent。</string>
+    <string name="handoff_return_now">立即交还</string>
+    <string name="handoff_cancel_return">取消本次交还</string>
+    <string name="toast_microphone_permission_required">需要麦克风权限</string>
+
+    <!-- Control panel -->
+    <string name="btn_memory_label">记</string>
+    <string name="supplement_hint">补充任务信息…</string>
+    <string name="supplement_prefix">补充：%1$s</string>
+    <string name="task_complete">任务完成：%1$s</string>
+    <string name="task_failed">任务失败：%1$s</string>
+    <string name="task_max_steps">已达最大步数 (%1$d)，任务未完成</string>
+    <string name="task_error">出错：%1$s</string>
+    <string name="task_complete_step">任务完成 (Step %1$d)</string>
+    <string name="handoff_sensitive_input">需要你在设备上完成敏感输入：%1$s</string>
+    <string name="handoff_waiting_hint">等待你完成敏感输入…</string>
+    <string name="handoff_reason_default">请在设备上完成敏感输入</string>
+    <string name="handoff_page_changed">页面已变化，Agent 接管中</string>
+
+    <!-- Settings -->
+    <string name="btn_manage_memory">管理记忆</string>
+
+    <!-- Memory screen -->
+    <string name="memory_title">记忆</string>
+    <string name="memory_search_hint">搜索记忆</string>
+    <string name="memory_dialog_key_hint">键名</string>
+    <string name="memory_dialog_value_hint">内容</string>
+    <string name="memory_dialog_category_hint">分类</string>
+    <string name="memory_dialog_add_title">新增记忆</string>
+    <string name="memory_dialog_edit_title">编辑记忆</string>
+    <string name="memory_dialog_save">保存</string>
+    <string name="memory_dialog_cancel">取消</string>
+    <string name="memory_action_enable">启用</string>
+    <string name="memory_action_disable">停用</string>
+    <string name="memory_action_delete">删除</string>
+    <string name="memory_status_enabled">启用</string>
+    <string name="memory_status_disabled">停用</string>
+    <string name="memory_source_ai">AI 记住</string>
+    <string name="memory_source_user">用户添加</string>
+    <string name="memory_uncategorized">未分类</string>
+
+    <!-- Overlay -->
+    <string name="overlay_running">运行中</string>
+    <string name="overlay_waiting_answer">⚠ 等待回答</string>
+    <string name="overlay_waiting_handoff">⚠ 等待接管</string>
+    <string name="overlay_paused">已暂停</string>
+    <string name="overlay_paused_takeover">已暂停 / takeover</string>
+    <string name="overlay_stop">停止</string>
+    <string name="overlay_done">✓ 已完成</string>
+    <string name="overlay_failed">✗ 失败</string>
+    <string name="notif_task_completed">任务完成</string>
+    <string name="notif_task_failed_title">任务失败</string>
+
+    <!-- Supplement info (VD view) -->
+    <string name="supplement_info">补充信息</string>
+
+    <!-- Notifications -->
+    <string name="notif_needs_answer">OpenCyvis 需要回答</string>
+    <string name="notif_open_app">打开 OpenCyvis</string>
+    <string name="notif_channel_ask">OpenCyvis 提问</string>
+    <string name="notif_channel_ask_desc">Agent 等待用户回答时的高优先级提醒</string>
+    <string name="notif_max_steps_reached">已达到最大步数限制 (%1$d)</string>
+</resources>

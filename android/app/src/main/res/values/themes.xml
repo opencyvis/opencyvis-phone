@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.OpenCyvis" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">#FF0D0D0D</item>
+        <item name="colorPrimaryDark">#FF080808</item>
+        <item name="colorAccent">#FFCBA135</item>
+        <item name="android:statusBarColor">#FF0D0D0D</item>
+        <item name="android:navigationBarColor">#FF0D0D0D</item>
+        <item name="android:windowBackground">#FF0D0D0D</item>
+    </style>
+
+    <style name="Theme.OpenCyvis.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#FF0D0D0D</item>
+        <item name="colorPrimaryDark">#FF080808</item>
+        <item name="colorAccent">#FFCBA135</item>
+        <item name="android:statusBarColor">#FF0D0D0D</item>
+        <item name="android:navigationBarColor">#FF0D0D0D</item>
+        <item name="android:windowBackground">#FF0D0D0D</item>
+    </style>
+
+    <!-- Button style that respects android:background drawable -->
+    <style name="OpenCyvis.Button.Custom" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="backgroundTint">@null</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+    </style>
+</resources>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenCyvis</string>
+    <string name="hint_api_key">API Key</string>
+    <string name="hint_model">Model (e.g. gpt-5.5, claude-sonnet-4-7)</string>
+    <string name="hint_base_url">Base URL</string>
+    <string name="label_max_steps">Max steps: 100</string>
+    <string name="hint_max_steps">Max steps (default: 100)</string>
+    <string name="label_debug_mode">Debug mode: show LLM response details</string>
+    <string name="btn_start">Start Agent</string>
+    <string name="btn_test_screenshot">Test Screenshot</string>
+    <string name="btn_test_tap">Test Tap Center</string>
+    <string name="vd_btn_back">Back</string>
+    <string name="vd_btn_minimize">Min</string>
+    <string name="vd_btn_take_over">Take over</string>
+    <string name="vd_btn_return_control">Return</string>
+    <string name="vd_btn_stop">Stop</string>
+    <string name="vd_hint_answer">Your answer...</string>
+    <string name="vd_cd_minimize">Minimize to floating window</string>
+    <string name="handoff_title">Input takeover required</string>
+    <string name="handoff_active_message">Please complete sensitive input on the device. The agent will not read or store your input.</string>
+    <string name="handoff_pending_message">Returning control to agent in %1$d seconds.</string>
+    <string name="handoff_return_now">Return now</string>
+    <string name="handoff_cancel_return">Cancel return</string>
+    <string name="toast_microphone_permission_required">Microphone permission is required</string>
+    <string-array name="api_providers">
+        <item>OpenAI Compatible</item>
+        <item>Anthropic</item>
+        <item>Ollama (Local)</item>
+    </string-array>
+
+    <!-- Control panel -->
+    <string name="btn_memory_label">Mem</string>
+    <string name="supplement_hint">Add task info…</string>
+    <string name="supplement_prefix">Supplement: %1$s</string>
+    <string name="task_complete">Task completed: %1$s</string>
+    <string name="task_failed">Task failed: %1$s</string>
+    <string name="task_max_steps">Max steps reached (%1$d), task incomplete</string>
+    <string name="task_error">Error: %1$s</string>
+    <string name="task_complete_step">Task completed (Step %1$d)</string>
+    <string name="handoff_sensitive_input">Sensitive input required on device: %1$s</string>
+    <string name="handoff_waiting_hint">Waiting for you to complete sensitive input…</string>
+    <string name="handoff_reason_default">Please complete sensitive input on the device</string>
+    <string name="handoff_page_changed">Page has changed, agent taking over</string>
+
+    <!-- Settings -->
+    <string name="btn_manage_memory">Manage Memory</string>
+
+    <!-- Memory screen -->
+    <string name="memory_title">Memory</string>
+    <string name="memory_search_hint">Search memories</string>
+    <string name="memory_dialog_key_hint">Key</string>
+    <string name="memory_dialog_value_hint">Content</string>
+    <string name="memory_dialog_category_hint">Category</string>
+    <string name="memory_dialog_add_title">Add Memory</string>
+    <string name="memory_dialog_edit_title">Edit Memory</string>
+    <string name="memory_dialog_save">Save</string>
+    <string name="memory_dialog_cancel">Cancel</string>
+    <string name="memory_action_enable">Enable</string>
+    <string name="memory_action_disable">Disable</string>
+    <string name="memory_action_delete">Delete</string>
+    <string name="memory_status_enabled">Enabled</string>
+    <string name="memory_status_disabled">Disabled</string>
+    <string name="memory_source_ai">Remembered by AI</string>
+    <string name="memory_source_user">Added by user</string>
+    <string name="memory_uncategorized">Uncategorized</string>
+
+    <!-- Overlay -->
+    <string name="overlay_running">Running</string>
+    <string name="overlay_waiting_answer">⚠ Waiting for answer</string>
+    <string name="overlay_waiting_handoff">⚠ Waiting for handoff</string>
+    <string name="overlay_paused">Paused</string>
+    <string name="overlay_paused_takeover">Paused / takeover</string>
+    <string name="overlay_stop">Stop</string>
+    <string name="overlay_done">✓ Done</string>
+    <string name="overlay_failed">✗ Failed</string>
+    <string name="notif_task_completed">Task Completed</string>
+    <string name="notif_task_failed_title">Task Failed</string>
+
+    <!-- Supplement info (VD view) -->
+    <string name="supplement_info">Supplemental Info</string>
+
+    <!-- Notifications -->
+    <string name="notif_needs_answer">OpenCyvis needs your answer</string>
+    <string name="notif_open_app">Open OpenCyvis</string>
+    <string name="notif_channel_ask">OpenCyvis Questions</string>
+    <string name="notif_channel_ask_desc">High-priority alerts when the agent is waiting for your answer</string>
+    <string name="notif_max_steps_reached">Max steps reached (%1$d)</string>
+</resources>

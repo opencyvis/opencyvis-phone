@@ -1,0 +1,26 @@
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties
+*.apk
+*.idsig
+*.jks
+*.keystore
+*.pem
+*.so
+*.dylib
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Project-specific
+platform-key/
+.superpowers/
+.claude/
