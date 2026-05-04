@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenCyvis — Open Cyber Jarvis</title>
+<meta name="description" content="The open-source AI phone. Commercial AI phones are black boxes. This one isn't.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,300&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #08090c;
+  --bg-elevated: #0e1015;
+  --text: #e4e2df;
+  --muted: #7a7672;
+  --accent: #d4a039;
+  --accent-dim: #b8842a;
+  --accent-glow: rgba(212, 160, 57, 0.15);
+  --cyan: #4ecdc4;
+  --cyan-dim: rgba(78, 205, 196, 0.08);
+  --border: #1a1c22;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'DM Sans', -apple-system, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Noise texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* NAV */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  background: rgba(8, 9, 12, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-logo {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.nav-logo .accent { color: var(--accent); }
+
+.nav-links { display: flex; gap: 28px; }
+
+.nav-links a {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.nav-links a:hover { color: var(--text); }
+
+.nav-links a.cta {
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  padding: 6px 14px;
+  border-radius: 4px;
+}
+
+.nav-links a.cta:hover {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+/* HERO */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 140px 32px 80px;
+  position: relative;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.hero-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 24px;
+  opacity: 0;
+  animation: fadeUp 0.8s ease forwards;
+}
+
+.hero h1 {
+  font-family: var(--font-mono);
+  font-size: clamp(36px, 5.5vw, 64px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeUp 0.8s ease 0.15s forwards;
+}
+
+.hero h1 .thin {
+  font-weight: 300;
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--muted);
+}
+
+.hero-sub {
+  font-size: 18px;
+  color: var(--muted);
+  max-width: 520px;
+  line-height: 1.7;
+  opacity: 0;
+  animation: fadeUp 0.8s ease 0.3s forwards;
+}
+
+.hero-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 40px;
+  letter-spacing: 0.08em;
+  opacity: 0;
+  animation: fadeUp 0.8s ease 0.45s forwards;
+}
+
+.hero-name b { color: var(--accent); }
+
+/* VIRTUAL DISPLAY VISUAL */
+.vd-visual {
+  margin-top: 64px;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  opacity: 0;
+  animation: fadeUp 1s ease 0.6s forwards;
+  position: relative;
+  z-index: 1;
+}
+
+.vd-screen {
+  width: 180px;
+  height: 320px;
+  border-radius: 20px;
+  border: 2px solid var(--border);
+  background: var(--bg-elevated);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.vd-screen.yours {
+  border-color: #2a2c32;
+}
+
+.vd-screen.ai {
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 40px var(--accent-glow), inset 0 0 30px rgba(212, 160, 57, 0.03);
+}
+
+.vd-screen.ai::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background: linear-gradient(135deg, var(--accent), transparent, var(--cyan)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: borderGlow 3s ease-in-out infinite;
+}
+
+.vd-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 12px;
+}
+
+.vd-screen.ai .vd-label { color: var(--accent); }
+
+.vd-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.vd-line {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  width: 100%;
+}
+
+.vd-line.short { width: 60%; }
+.vd-line.med { width: 80%; }
+
+.vd-screen.ai .vd-line {
+  background: rgba(212, 160, 57, 0.12);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.vd-screen.ai .vd-line:nth-child(2) { animation-delay: 0.3s; }
+.vd-screen.ai .vd-line:nth-child(3) { animation-delay: 0.6s; }
+.vd-screen.ai .vd-line:nth-child(4) { animation-delay: 0.9s; }
+
+.vd-arrow {
+  font-size: 20px;
+  color: var(--border);
+}
+
+/* SECTION STYLES */
+section {
+  padding: 120px 40px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+section.full {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+section h2 {
+  font-family: var(--font-mono);
+  font-size: clamp(24px, 3.5vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 24px;
+  line-height: 1.2;
+}
+
+section p.lead {
+  font-size: 17px;
+  color: var(--muted);
+  line-height: 1.8;
+  max-width: 600px;
+}
+
+/* WHY SECTION */
+.why-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  margin-top: 48px;
+}
+
+.why-point h3 {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.why-point p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+/* COMPARISON */
+.compare-section {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 80px 40px;
+}
+
+.compare-table {
+  max-width: 900px;
+  margin: 0 auto;
+  overflow-x: auto;
+}
+
+.compare-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 14px 16px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-table th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.compare-table th:first-child,
+.compare-table td:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+.compare-table th:last-child {
+  color: var(--accent);
+}
+
+.compare-table td:last-child {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.compare-table tr:hover td {
+  background: rgba(212, 160, 57, 0.02);
+}
+
+/* FEATURES */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  margin-top: 48px;
+}
+
+.feature-card {
+  background: var(--bg);
+  padding: 36px 28px;
+}
+
+.feature-card h3 {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+}
+
+.feature-card p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+/* TECHNOLOGY */
+.tech-section {
+  border-top: 1px solid var(--border);
+}
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 48px;
+}
+
+.tech-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 32px 28px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.tech-card:hover {
+  border-color: #2a2c32;
+}
+
+.tech-card.featured {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: center;
+}
+
+.tech-card .tech-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-dim);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.tech-card h3 {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  line-height: 1.3;
+}
+
+.tech-card p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.tech-card .tech-detail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  line-height: 1.7;
+}
+
+.tech-card .tech-detail .hl { color: var(--cyan); }
+.tech-card .tech-detail .accent { color: var(--accent); }
+
+.tech-channels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.tech-channel {
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.tech-channel h4 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--cyan);
+}
+
+.tech-channel p {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.tech-philosophy {
+  margin-top: 40px;
+  padding: 24px 28px;
+  border-left: 2px solid var(--accent-dim);
+  background: rgba(212, 160, 57, 0.03);
+  border-radius: 0 6px 6px 0;
+}
+
+.tech-philosophy p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.8;
+  font-style: italic;
+}
+
+.tech-philosophy b { color: var(--text); font-style: normal; }
+
+@media (max-width: 768px) {
+  .tech-grid { grid-template-columns: 1fr; }
+  .tech-card.featured { grid-template-columns: 1fr; }
+  .tech-channels { grid-template-columns: 1fr; }
+}
+
+/* MODELS */
+.models-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-top: 40px;
+}
+
+.model-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 28px 24px;
+  border-radius: 8px;
+  transition: border-color 0.2s;
+}
+
+.model-card:hover {
+  border-color: #2a2c32;
+}
+
+.model-card h3 {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.model-card .examples {
+  font-size: 12px;
+  color: var(--accent-dim);
+  font-family: var(--font-mono);
+  margin-bottom: 10px;
+}
+
+.model-card p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* BENCHMARK TABLE */
+.bench-table {
+  margin-top: 40px;
+  overflow-x: auto;
+}
+
+.bench-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.bench-table th,
+.bench-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.bench-table th {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bench-table td { color: var(--muted); }
+
+.bench-table td:first-child {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.bench-table .pass { color: var(--cyan); }
+
+.bench-table .recommend {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 16px;
+  font-style: italic;
+}
+
+.bench-table .recommend b { color: var(--accent); font-style: normal; }
+
+/* PRIVACY */
+.privacy-section {
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.privacy-flow {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 32px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.8;
+}
+
+.privacy-flow .hl { color: var(--accent); }
+
+.privacy-points {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 32px;
+}
+
+.privacy-points li {
+  list-style: none;
+  font-size: 14px;
+  color: var(--muted);
+  padding-left: 20px;
+  position: relative;
+  line-height: 1.6;
+}
+
+.privacy-points li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+
+/* GETTING STARTED */
+.start-code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 24px;
+  margin-top: 24px;
+  overflow-x: auto;
+  line-height: 1.8;
+  color: var(--muted);
+}
+
+.start-code .cmd { color: var(--text); }
+.start-code .comment { color: #555; }
+
+/* FOOTER */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+footer .copy {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+footer .links {
+  display: flex;
+  gap: 24px;
+}
+
+footer .links a {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+footer .links a:hover { color: var(--text); }
+
+/* ANIMATIONS */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@keyframes borderGlow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* SCROLL REVEAL */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  nav { padding: 16px 20px; }
+  .nav-links { gap: 16px; }
+  section { padding: 80px 20px; }
+  .hero { padding: 120px 20px 60px; }
+  .why-grid { grid-template-columns: 1fr; gap: 32px; }
+  .features-grid { grid-template-columns: 1fr; }
+  .models-grid { grid-template-columns: 1fr; }
+  .privacy-points { grid-template-columns: 1fr; }
+  .vd-visual { flex-direction: column; gap: 16px; }
+  .vd-screen { width: 140px; height: 240px; }
+  .compare-section { padding: 60px 20px; }
+  footer { flex-direction: column; gap: 16px; padding: 32px 20px; }
+}
+
+@media (max-width: 480px) {
+  .nav-links a.cta { display: none; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Open<span class="accent">Cyvis</span></div>
+  <div class="nav-links">
+    <a href="https://github.com/opencyvis/opencyvis-phone">GitHub</a>
+    <a href="story.html">Story</a>
+    <a href="#features">Features</a>
+    <a href="#tech">Technology</a>
+    <a href="#models">Models</a>
+    <a href="#start" class="cta">Get Started</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-eyebrow">Open-source AI Phone</div>
+  <h1>Your phone. <span class="thin">Your AI.</span></h1>
+  <p class="hero-sub">Commercial AI phones are black boxes. This one isn't. See every line of code, pick your model, control your data.</p>
+  <p class="hero-name"><b>Open</b> <b>Cy</b>ber Jar<b>vis</b></p>
+
+  <div class="vd-visual">
+    <div class="vd-screen yours">
+      <div class="vd-content">
+        <div class="vd-line"></div>
+        <div class="vd-line med"></div>
+        <div class="vd-line short"></div>
+        <div class="vd-line"></div>
+        <div class="vd-line med"></div>
+      </div>
+      <div class="vd-label">Your screen</div>
+    </div>
+    <div class="vd-arrow">⟷</div>
+    <div class="vd-screen ai">
+      <div class="vd-content">
+        <div class="vd-line"></div>
+        <div class="vd-line short"></div>
+        <div class="vd-line med"></div>
+        <div class="vd-line"></div>
+      </div>
+      <div class="vd-label">AI works here</div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section class="reveal">
+  <div class="section-label">Why</div>
+  <h2>You should at least have the choice.</h2>
+  <p class="lead">When a company ships an "AI phone," they get full access to your screen, apps, messages, banking — and you can't see the model, can't verify what leaves your device, can't choose an alternative.</p>
+
+  <div class="why-grid">
+    <div class="why-point">
+      <h3>Doubao AI Phone</h3>
+      <p>Locked to ByteDance's model.</p>
+    </div>
+    <div class="why-point">
+      <h3>Samsung Galaxy AI</h3>
+      <p>Locked to Samsung + Google.</p>
+    </div>
+    <div class="why-point">
+      <h3>Google Built-in AI</h3>
+      <p>Gemini only. You get what they give you.</p>
+    </div>
+    <div class="why-point">
+      <h3>OpenCyvis</h3>
+      <p>You see the code. You pick the model. You decide where data goes.</p>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="full compare-section reveal">
+  <div class="compare-table">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Commercial AI Phones</th>
+          <th>Cloud Phones</th>
+          <th>ADB-based Agents</th>
+          <th>OpenCyvis</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Open source</td>
+          <td>&#10005;</td>
+          <td>&#10005;</td>
+          <td>⚠️</td>
+          <td>&#10003;</td>
+        </tr>
+        <tr>
+          <td>Choose your AI model</td>
+          <td>&#10005;</td>
+          <td>&#10005;</td>
+          <td>⚠️</td>
+          <td>&#10003;</td>
+        </tr>
+        <tr>
+          <td>Data stays on device</td>
+          <td>&#10005;</td>
+          <td>&#10005;</td>
+          <td>⚠️</td>
+          <td>&#10003;</td>
+        </tr>
+        <tr>
+          <td>Phone usable while AI works</td>
+          <td>⚠️</td>
+          <td>&#10003;</td>
+          <td>&#10005;</td>
+          <td>&#10003;</td>
+        </tr>
+        <tr>
+          <td>Works with any app</td>
+          <td>⚠️</td>
+          <td>⚠️</td>
+          <td>⚠️</td>
+          <td>&#10003;</td>
+        </tr>
+        <tr>
+          <td>No ADB required</td>
+          <td>⚠️</td>
+          <td>⚠️</td>
+          <td>&#10005;</td>
+          <td>&#10003;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="reveal">
+  <div class="section-label">Features</div>
+  <h2>What it does</h2>
+  <p class="lead">Give it a task in natural language. It sees your screen, understands the UI, and operates apps just like you would — in the background.</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <h3>Background Operation</h3>
+      <p>AI works on a virtual display. Your phone stays free.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Any AI Model</h3>
+      <p>Qwen, Claude, GPT, Llama, Gemma — or run locally with Ollama.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Visual + Structural</h3>
+      <p>Reads both screenshots and the accessibility tree simultaneously.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Watch & Takeover</h3>
+      <p>Observe in real-time. Take control anytime. Hand back seamlessly.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Asks When Unsure</h3>
+      <p>Pauses on ambiguity instead of guessing. "Which Zhang Wei? I see three."</p>
+    </div>
+    <div class="feature-card">
+      <h3>Offline Voice</h3>
+      <p>On-device speech recognition. No internet needed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- TECHNOLOGY -->
+<section id="tech" class="tech-section reveal">
+  <div class="section-label">Technology</div>
+  <h2>How it actually works</h2>
+  <p class="lead">Not just another screenshot → LLM → tap loop. OpenCyvis makes specific architectural choices that matter in practice.</p>
+
+  <div class="tech-grid">
+
+    <div class="tech-card featured">
+      <div>
+        <div class="tech-num">01 — Perception</div>
+        <h3>Dual-Channel Perception</h3>
+        <p>Most phone agents rely solely on screenshots — the model "sees" the screen and guesses coordinates. This vision-only approach frequently misses targets on complex UIs.</p>
+        <p style="margin-top: 8px;">OpenCyvis feeds <b style="color: var(--text)">both</b> a pixel-level screenshot <b style="color: var(--text)">and</b> the structured Accessibility Tree on every step. The screenshot provides semantic understanding; the UI tree provides precise coordinates.</p>
+      </div>
+      <div>
+        <div class="tech-channels">
+          <div class="tech-channel">
+            <h4>Screenshot</h4>
+            <p>Visual layout, colors, icons, text rendering. Answers: "What is this?"</p>
+          </div>
+          <div class="tech-channel">
+            <h4>UI Element Tree</h4>
+            <p>Widget type, exact bounds, text content, hierarchy. Answers: "Where is it?"</p>
+          </div>
+        </div>
+        <div class="tech-detail">Vision-only agents: <span class="hl">~60% tap accuracy</span> on complex UIs<br>Dual-channel: <span class="accent">precise coordinate targeting</span> via a11y bounds</div>
+      </div>
+    </div>
+
+    <div class="tech-card">
+      <div class="tech-num">02 — Actions</div>
+      <h3>Native Tool Calling</h3>
+      <p>No regex parsing of free text. The model returns structured JSON via LLM function calling protocol — directly parseable, always verifiable.</p>
+      <div class="tech-detail"><span class="accent">14 action types:</span> tap, swipe, type_text, open_app, ask_user, note, remember, handoff_user, wait, finish, fail, long_press, key_event</div>
+    </div>
+
+    <div class="tech-card">
+      <div class="tech-num">03 — Memory</div>
+      <h3>Two-Tier Memory</h3>
+      <p>Per-task <b style="color: var(--text)">notes</b> carry information across steps (price found in app A, compared in app B). Cross-task <b style="color: var(--text)">remember</b> persists user preferences in local DB.</p>
+      <div class="tech-detail"><span class="hl">note</span> → working scratchpad, 10 slots, FIFO<br><span class="hl">remember</span> → persistent memory, survives across tasks</div>
+    </div>
+
+    <div class="tech-card">
+      <div class="tech-num">04 — Display</div>
+      <h3>VirtualDisplay Isolation</h3>
+      <p>A real Android display created via system API — not a screen overlay or accessibility hack. Apps are migrated to it and run natively. Screenshot capture and input injection target this display independently.</p>
+      <div class="tech-detail">DisplayManager.<span class="hl">createVirtualDisplay()</span><br>IActivityTaskManager.<span class="hl">moveTaskToDisplay()</span><br>InputManager.<span class="hl">injectInputEvent(displayId)</span></div>
+    </div>
+
+    <div class="tech-card">
+      <div class="tech-num">05 — Philosophy</div>
+      <h3>Minimal Engineering Constraints</h3>
+      <p>No intent classifiers, no task templates, no workflow routers. The model itself understands intent, plans steps, and calls tools. The system scales with model improvements — no code changes needed.</p>
+      <div class="tech-detail">A <span class="accent">1.8 GB</span> local model (Gemma 4 E2B) passes all 4 test scenarios.<br>Hardcoded rules become tech debt as models outgrow them.</div>
+    </div>
+
+  </div>
+
+  <div class="tech-philosophy">
+    <p><b>Design principle:</b> Let the model do the thinking. Keep the engineering minimal. As foundation models improve, this architecture scales naturally — without rewriting task logic or adding orchestration layers.</p>
+  </div>
+</section>
+
+<!-- MODELS -->
+<section id="models" class="reveal">
+  <div class="section-label">Models</div>
+  <h2>Model-agnostic</h2>
+  <p class="lead">Bring your own API key, or run a local model and never make a network call.</p>
+
+  <div class="models-grid">
+    <div class="model-card">
+      <h3>OpenAI-compatible</h3>
+      <div class="examples">Qwen, GPT-4o</div>
+      <p>Works with any OpenAI-compatible API endpoint.</p>
+    </div>
+    <div class="model-card">
+      <h3>Anthropic</h3>
+      <div class="examples">Claude Opus 4</div>
+      <p>Native Anthropic API support.</p>
+    </div>
+    <div class="model-card">
+      <h3>Ollama (Local)</h3>
+      <div class="examples">Gemma, Llama, Qwen</div>
+      <p>On-device or self-hosted. Nothing leaves your control.</p>
+    </div>
+  </div>
+
+  <div class="bench-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Size</th>
+          <th>Speed</th>
+          <th>Pass Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Gemma 4 26B-A4B Q4</td>
+          <td>17 GB</td>
+          <td>63 tok/s</td>
+          <td class="pass">4/4</td>
+        </tr>
+        <tr>
+          <td>Gemma 4 E2B Q4</td>
+          <td>1.8 GB</td>
+          <td>41 tok/s</td>
+          <td class="pass">4/4</td>
+        </tr>
+        <tr>
+          <td>Gemma 4 31B Q4</td>
+          <td>19 GB</td>
+          <td>16 tok/s</td>
+          <td class="pass">4/4</td>
+        </tr>
+        <tr>
+          <td>Qwen 3.5 35B-A3B Q4</td>
+          <td>22 GB</td>
+          <td>47 tok/s</td>
+          <td>3/4</td>
+        </tr>
+        <tr>
+          <td>Gemma 4 E4B Q4</td>
+          <td>3 GB</td>
+          <td>61 tok/s</td>
+          <td>3/4</td>
+        </tr>
+        <tr>
+          <td>GUI-Owl 1.5 8B Q4</td>
+          <td>5.4 GB</td>
+          <td>75 tok/s</td>
+          <td>2/4</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="recommend"><b>Recommended:</b> Gemma 4 26B-A4B — best balance of speed, quality, and memory. &nbsp; <b>Minimal:</b> Gemma 4 E2B — just 1.8 GB, still passes all 4 tests.</p>
+  </div>
+</section>
+
+<!-- PRIVACY -->
+<section class="privacy-section full reveal">
+  <div style="max-width: 1000px; margin: 0 auto; padding: 120px 40px;">
+    <div class="section-label">Privacy & Security</div>
+    <h2>Not a place for "trust us."</h2>
+    <p class="lead">An AI agent with full phone access is one of the most privileged pieces of software you can run.</p>
+
+    <ul class="privacy-points">
+      <li>Screenshots and UI tree stay in memory — never written to disk</li>
+      <li>You choose the endpoint — self-hosted, private cloud, or fully local</li>
+      <li>No telemetry, no analytics, no phone-home — zero tracking code</li>
+      <li>Local model option — use Ollama and nothing leaves the device</li>
+      <li>Open source — security researchers, journalists, anyone can audit</li>
+      <li>100% of code is public. Always.</li>
+    </ul>
+
+    <div class="privacy-flow">Your screen ──→ Screenshot (<span class="hl">RAM only</span>) ──→ Your chosen AI ──→ Action
+                                          ↑
+                             <span class="hl">You control this endpoint</span></div>
+  </div>
+</section>
+
+<!-- GETTING STARTED -->
+<section id="start" class="reveal">
+  <div class="section-label">Getting Started</div>
+  <h2>Build from source</h2>
+  <p class="lead">Requires AOSP 16 (API 36+) with platform key signing. See the <a href="https://github.com/opencyvis/opencyvis-phone/blob/main/docs/aosp-deployment.md" style="color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-dim);">AOSP deployment guide</a> for device setup, symlinks, and signing.</p>
+
+  <pre class="start-code"><span class="comment"># Clone and build</span>
+<span class="cmd">git clone https://github.com/opencyvis/opencyvis-phone.git</span>
+<span class="cmd">cd opencyvis-phone/android</span>
+<span class="cmd">./gradlew assembleRelease</span>
+
+<span class="comment"># No device? Try the emulator</span>
+<span class="cmd">./scripts/deploy-emu.sh</span>
+
+<span class="comment"># Configure — local Ollama (fully private)</span>
+<span class="cmd">adb shell am start -a android.intent.action.VIEW \</span>
+<span class="cmd">  -d "opencyvis://config?provider=ollama\</span>
+<span class="cmd">    &amp;base_url=http://localhost:11434&amp;model=gemma4:26b"</span></pre>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="copy">© 2026 OpenCyvis Contributors · Apache 2.0</div>
+  <div class="links">
+    <a href="https://github.com/opencyvis/opencyvis-phone">GitHub</a>
+    <a href="story.html">Story</a>
+    <a href="docs/aosp-deployment.md">Deploy Guide</a>
+    <a href="https://x.com/flanker_hqd">X</a>
+    <a href="https://blog.flanker017.me">Blog</a>
+  </div>
+</footer>
+
+<script>
+const reveals = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.12 });
+
+reveals.forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

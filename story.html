@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Why I Built OpenCyvis</title>
+<meta name="description" content="The story behind OpenCyvis — an open-source AI phone. Why commercial AI phones are black boxes, and how we built the alternative.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,300&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #08090c;
+  --bg-elevated: #0e1015;
+  --text: #e4e2df;
+  --muted: #7a7672;
+  --accent: #d4a039;
+  --accent-dim: #b8842a;
+  --accent-glow: rgba(212, 160, 57, 0.15);
+  --cyan: #4ecdc4;
+  --cyan-dim: rgba(78, 205, 196, 0.08);
+  --border: #1a1c22;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'DM Sans', -apple-system, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* NAV */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  background: rgba(8, 9, 12, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-logo {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav-logo .accent { color: var(--accent); }
+
+.nav-links { display: flex; gap: 28px; }
+
+.nav-links a {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.nav-links a:hover { color: var(--text); }
+
+/* ARTICLE HERO */
+.story-hero {
+  padding: 160px 40px 80px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.story-hero .eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 24px;
+}
+
+.story-hero h1 {
+  font-family: var(--font-mono);
+  font-size: clamp(28px, 4.5vw, 48px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 20px;
+}
+
+.story-hero .subtitle {
+  font-size: 18px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 560px;
+}
+
+/* ARTICLE BODY */
+.article {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 40px 120px;
+}
+
+.article h2 {
+  font-family: var(--font-mono);
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 80px;
+  margin-bottom: 24px;
+  line-height: 1.25;
+  padding-top: 40px;
+  border-top: 1px solid var(--border);
+}
+
+.article h2:first-of-type {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+
+.article h3 {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 48px;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.article p {
+  font-size: 17px;
+  color: var(--muted);
+  line-height: 1.85;
+  margin-bottom: 20px;
+}
+
+.article p b,
+.article p strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.article a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent-dim);
+  transition: border-color 0.2s;
+}
+
+.article a:hover { border-color: var(--accent); }
+
+.article blockquote {
+  margin: 32px 0;
+  padding: 20px 24px;
+  border-left: 2px solid var(--accent-dim);
+  background: rgba(212, 160, 57, 0.03);
+  border-radius: 0 6px 6px 0;
+}
+
+.article blockquote p {
+  font-size: 15px;
+  font-style: italic;
+  margin-bottom: 0;
+}
+
+.article blockquote b { color: var(--text); font-style: normal; }
+
+/* TABLES */
+.article table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 32px 0;
+}
+
+.article th,
+.article td {
+  padding: 14px 16px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.article th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.article th:first-child,
+.article td:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+.article tr:hover td {
+  background: rgba(212, 160, 57, 0.02);
+}
+
+.article .pass {
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+/* FIGURES */
+.article figure {
+  margin: 40px 0;
+}
+
+.article figure img {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.article figure figcaption {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 12px;
+}
+
+.article .gif-row {
+  display: flex;
+  gap: 20px;
+  margin: 40px 0;
+}
+
+.article .gif-row img {
+  width: calc(50% - 10px);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.article .gif-row figcaption {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 8px;
+}
+
+/* CODE */
+.article code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--cyan);
+}
+
+.article pre {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 24px;
+  margin: 24px 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.article pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* ASCII ART */
+.article .ascii-art {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 32px 0;
+  padding: 20px 24px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.article .ascii-art .hl { color: var(--cyan); }
+.article .ascii-art .accent { color: var(--accent); }
+
+/* LIST */
+.article ul {
+  margin: 16px 0 24px 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.article ul li {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.8;
+  padding-left: 20px;
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.article ul li::before {
+  content: '\2192';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+
+/* FOOTER */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1000px;
+  margin: 0 auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+footer .links { display: flex; gap: 24px; }
+
+footer a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+footer a:hover { color: var(--text); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.story-hero .eyebrow { opacity: 0; animation: fadeUp 0.8s ease forwards; }
+.story-hero h1 { opacity: 0; animation: fadeUp 0.8s ease 0.15s forwards; }
+.story-hero .subtitle { opacity: 0; animation: fadeUp 0.8s ease 0.3s forwards; }
+
+@media (max-width: 768px) {
+  nav { padding: 16px 20px; }
+  .nav-links { gap: 16px; }
+  .story-hero { padding: 120px 20px 60px; }
+  .article { padding: 0 20px 80px; }
+  .article h2 { margin-top: 60px; }
+  .article .gif-row { flex-direction: column; }
+  .article .gif-row img { width: 100%; }
+  footer { flex-direction: column; gap: 16px; text-align: center; padding: 32px 20px; }
+  footer .links { flex-wrap: wrap; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+  .nav-links a:not(.back-link) { display: none; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo">Open<span class="accent">Cyvis</span></a>
+  <div class="nav-links">
+    <a href="index.html" class="back-link">&larr; Home</a>
+    <a href="https://github.com/opencyvis/opencyvis-phone">GitHub</a>
+  </div>
+</nav>
+
+<header class="story-hero">
+  <div class="eyebrow">The Story</div>
+  <h1>Why I Built OpenCyvis</h1>
+  <p class="subtitle">Commercial AI phones are black boxes. You can't see the model, can't verify what data leaves your device, can't choose an alternative. This is the open-source answer.</p>
+</header>
+
+<article class="article">
+
+<h2>Background</h2>
+
+<p>Over the past year, several companies have launched "AI phone" products — Doubao, Samsung Galaxy AI, Google's Gemini integration, and others. The core idea is the same: AI understands the screen and performs tasks on behalf of the user.</p>
+
+<p>But these products share a common trait: <b>they're all closed</b>. The model is chosen by the vendor. Your data is processed through the vendor's servers. You can't audit what happens in between, and you can't swap in a model you trust.</p>
+
+<p>The open-source community has made attempts too — various ADB-based PhoneUse projects, for example. They let you choose your own model, but they require a computer connection, and the AI takes over your screen while it works.</p>
+
+<p><b>OpenCyvis addresses both problems.</b></p>
+
+<h2>Core Design</h2>
+
+<h3>Open Source + Model Choice</h3>
+
+<p>This is the most important point of the entire project.</p>
+
+<p>An AI that can see your screen and operate your apps is, by nature, <b>the most privileged piece of software on your phone</b>. What model it runs, who receives the screenshots, what happens to the data at each step — users should be able to verify all of this, not just take the vendor's word for it.</p>
+
+<p>OpenCyvis's approach: all code is open source, and the LLM backend is configured by the user. Three provider types are currently supported:</p>
+
+<table>
+  <thead><tr><th>Provider Type</th><th>Examples</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>OpenAI-compatible API</td><td>Qwen, GPT</td><td>Default — connects to any OpenAI-compatible endpoint</td></tr>
+    <tr><td>Anthropic API</td><td>Claude Sonnet</td><td>Native Anthropic protocol</td></tr>
+    <tr><td>Ollama (local)</td><td>Gemma 4, Llama, Qwen</td><td>Model runs on-device; screenshots never leave the phone</td></tr>
+  </tbody>
+</table>
+
+<p>With a local model, the entire pipeline — screenshot, reasoning, execution — runs entirely on-device with <b>zero network requests</b>.</p>
+
+<h3>How the Agent Sees and Acts</h3>
+
+<p>At its core, OpenCyvis runs an <b>observe → think → act</b> loop. On every step, the model receives two types of input simultaneously:</p>
+
+<h3>Screenshot + UI Element Tree (Dual-Channel Perception)</h3>
+
+<p>Most open-source phone agents rely solely on screenshots — the model "sees" the screen and guesses where to tap. This vision-only approach frequently misses targets on complex UIs.</p>
+
+<p>OpenCyvis provides both inputs simultaneously: the screenshot gives the model semantic understanding of the current interface and its layout, while the UI element tree (Accessibility Tree) provides the exact coordinates, type, and hierarchy of every widget. The two are complementary — <b>visual information answers "what is this?", structural information answers "where is it?"</b></p>
+
+<h3>Native Tool Calling (14 Action Types)</h3>
+
+<p>Many open-source agents have the model output free text (e.g., "please tap the button in the middle of the screen"), then parse coordinates and actions with regex — a brittle and error-prone approach. OpenCyvis uses the LLM's <b>native function calling protocol</b>, where the model returns structured JSON action instructions directly. Supported actions include:</p>
+
+<ul>
+  <li><b>Interaction:</b> tap, long_press, swipe, type_text, key_event (back/home/enter, etc.), open_app</li>
+  <li><b>Flow control:</b> wait (wait for page load), finish (task complete), fail (cannot complete)</li>
+  <li><b>Dialogue:</b> ask_user (ask the user a question), handoff_user (return control)</li>
+  <li><b>Memory:</b> note (working memory), remember (cross-task persistent memory)</li>
+</ul>
+
+<p>This design ensures the model's output is always parseable and verifiable. There is never a "the model said something but the system didn't understand" scenario.</p>
+
+<h3>Working Memory (Note)</h3>
+
+<p>During multi-step operations, the model may need to carry intermediate information — for example, finding a price in one app and comparing it after switching to another. OpenCyvis provides a <b>note mechanism</b>: the model can attach a note to any action, recording key information. These notes are fed back as context in every subsequent step's prompt, essentially giving the AI a scratchpad. Up to 10 notes are retained, with FIFO eviction.</p>
+
+<p>There's also a <code>remember</code> mechanism for cross-task persistent memory — for example, if the user says "my delivery address is XX", the model can store it and use it directly the next time a similar task comes up.</p>
+
+<h2>Virtual Display: Background Operation</h2>
+
+<p>Currently, the open-source AI phone / phone automation community has two main technical approaches:</p>
+
+<p><b>ADB approach:</b> Control the phone externally via USB or network using <code>adb shell input</code> and <code>screencap</code>. The advantage is no system modification required. The downside: it requires a computer, and operations happen directly on the user's active screen — the user can't use their phone while the AI works.</p>
+
+<p><b>Accessibility Service approach:</b> Use Android's accessibility service to read the UI tree and perform actions. No computer needed, but it still operates on the foreground display, and the accessibility service permission model has limitations — some system operations and protected screens are unreachable.</p>
+
+<p>Both approaches share the same fundamental problem: <b>the AI and the user share the same screen</b>. When the AI is working, the user either waits or watches their phone being controlled by someone else.</p>
+
+<h3>What is VirtualDisplay?</h3>
+
+<p>VirtualDisplay is a native Android API that allows creating additional logical displays within the system. Its original use cases include Chromecast screen mirroring, split-screen mode, and Android Automotive multi-display. Each VirtualDisplay has an independent display ID, and apps can be migrated to any Display to run independently.</p>
+
+<p>OpenCyvis leverages this mechanism to create an <b>invisible background Display</b> within the system. The app the AI needs to operate is migrated to this background Display, and all of the AI's screenshots and touch injections target this Display. The user's foreground screen (Display 0) is completely unaffected.</p>
+
+<p>Implementation details:</p>
+
+<ul>
+  <li>Background display created via <code>DisplayManager.createVirtualDisplay()</code></li>
+  <li>Target app migrated via reflection call to <code>IActivityTaskManager.moveTaskToDisplay()</code></li>
+  <li>Screenshots captured using <code>SurfaceControl.screenshot(displayId)</code> (API 36+) with ImageReader fallback</li>
+  <li>Touch injection via <code>InputManager.injectInputEvent()</code> targeting the virtual displayId</li>
+  <li>Watch mode: SurfaceView renders VirtualDisplay content; Takeover mode: touch events are forwarded to the background Display</li>
+</ul>
+
+<p>These operations require platform signing to obtain permissions like <code>INJECT_EVENTS</code>, so OpenCyvis must be signed with the platform key and integrated into the system image.</p>
+
+<figure>
+  <img src="docs/demos/demo2_v3_cropped_4x.gif" alt="Watch mode: View AI operations on the virtual display in real time">
+  <figcaption>Watch mode: tap to see the AI's virtual display in real time</figcaption>
+</figure>
+
+<p>While the AI works in the background, a floating overlay appears on your home screen showing it's active. When the task completes, a notification pops up so you know it's done.</p>
+
+<figure>
+  <img src="docs/demos/demo_overlay_final_2x.gif" alt="Floating overlay + completion notification">
+  <figcaption>Floating overlay + completion notification</figcaption>
+</figure>
+
+<h2>Comparison with Existing Approaches</h2>
+
+<table>
+  <thead><tr><th>Feature</th><th>Commercial AI Phones</th><th>Cloud Phones</th><th>ADB-based</th><th>OpenCyvis</th></tr></thead>
+  <tbody>
+    <tr><td>Open source</td><td>No</td><td>No</td><td>Partial</td><td><b>Yes</b></td></tr>
+    <tr><td>User chooses model</td><td>No</td><td>No</td><td>Partial</td><td><b>Yes</b></td></tr>
+    <tr><td>Local model support</td><td>No</td><td>No</td><td>Partial</td><td><b>Yes</b></td></tr>
+    <tr><td>Phone usable while AI works</td><td>Varies</td><td>Yes</td><td>No</td><td><b>Yes</b></td></tr>
+    <tr><td>No ADB / computer needed</td><td>Yes</td><td>Varies</td><td>No</td><td><b>Yes</b></td></tr>
+  </tbody>
+</table>
+
+<h2>Local Model Benchmarks</h2>
+
+<p>We tested 6 local models across 4 real-world scenarios (open system settings, dial a phone number, recognize an impossible task, find a contact):</p>
+
+<table>
+  <thead><tr><th>Model</th><th>Architecture</th><th>Size</th><th>Speed</th><th>Pass Rate</th></tr></thead>
+  <tbody>
+    <tr><td><b>Gemma 4 26B-A4B</b> Q4</td><td>MoE (26B/4B)</td><td>17 GB</td><td>63 tok/s</td><td class="pass">4/4</td></tr>
+    <tr><td><b>Gemma 4 E2B</b> Q4</td><td>Dense (2B)</td><td>1.8 GB</td><td>41 tok/s</td><td class="pass">4/4</td></tr>
+    <tr><td><b>Qwen 3.5 35B-A3B</b> Q4</td><td>MoE (35B/3B)</td><td>22 GB</td><td>47 tok/s</td><td>3/4</td></tr>
+    <tr><td><b>Gemma 4 E4B</b> Q4</td><td>Dense (4B)</td><td>3 GB</td><td>61 tok/s</td><td>3/4</td></tr>
+    <tr><td><b>GUI-Owl 1.5 8B</b> Q4</td><td>Dense (8B)</td><td>5.4 GB</td><td>75 tok/s</td><td>2/4</td></tr>
+    <tr><td><b>GUI-Owl 1.5 32B</b> Q4</td><td>Dense (32B)</td><td>20.5 GB</td><td>23 tok/s</td><td>2/4</td></tr>
+  </tbody>
+</table>
+
+<p>A few noteworthy conclusions:</p>
+
+<ul>
+  <li><b>Gemma 4 E2B is only 1.8 GB</b>, yet passed all 4 tests. For everyday tasks, small models are already capable enough.</li>
+  <li><b>GUI-Owl</b> is a model specifically trained for GUI operations, but it actually underperformed compared to general-purpose models in our scenarios. The reason: it doesn't proactively ask the user when uncertain — general-purpose models' tool calling and reasoning capabilities matter more in practice.</li>
+  <li>The <b>MoE architecture</b> (Gemma 4 26B-A4B) strikes a good balance between speed and quality, and is currently the recommended default local model.</li>
+</ul>
+
+<p>Foundation model capabilities are advancing rapidly. Just last year, locally deployable open-source models couldn't support this kind of application — understanding complex phone interfaces, planning multi-step operations, making reasonable judgments under uncertainty. But this year, the new generation of models represented by Gemma 4 can handle these tasks locally with ease. A 1.8 GB model passing all tests would have been unimaginable a year or two ago.</p>
+
+<p>We've also observed that some commercial AI phone products build extensive engineering scaffolding on top of the model — dedicated intent recognition systems, predefined task templates, step-by-step workflow orchestration, and so on. These designs were necessary compensations when model capabilities were insufficient. But as foundation models' reasoning and tool-calling capabilities continue to strengthen, many of these constraints are becoming unnecessary. The model itself can understand intent, plan steps, and call tools — there's no need to wrap an additional layer of hardcoded logic around it.</p>
+
+<blockquote><p><b>This is also OpenCyvis's design choice:</b> minimize engineering constraints, and let the model handle the core capabilities. Models will keep improving; hardcoded rules will only become baggage.</p></blockquote>
+
+<h2>About the Name</h2>
+
+<p><b>OpenCyvis</b> = Open Cyber Jarvis.</p>
+
+<p>Jarvis is Tony Stark's AI butler in <em>Iron Man</em> — understanding the owner's intent and operating various systems to complete tasks. We think this image fits perfectly: an AI phone is essentially a digital assistant that understands your instructions and operates your phone to get things done. "Cyber" emphasizes it lives in the digital world, and "Open" means everything is transparent.</p>
+
+<h2>What's Next</h2>
+
+<p>Currently, OpenCyvis requires flashing an AOSP system image because it depends on platform signing permissions. This is the biggest barrier to adoption.</p>
+
+<p>Next directions:</p>
+
+<ul>
+  <li><b>Lighter installation</b> — exploring approaches that don't require flashing a ROM, lowering the barrier to entry</li>
+  <li><b>Cross-device coordination</b> — phone and desktop working together</li>
+</ul>
+
+<h3>Vision</h3>
+
+<p>An AI phone should be <b>public infrastructure</b>, not a proprietary product of any single company. Our goal is to establish an open mobile AI standard — so that everyone can own, audit, and control their own AI assistant.</p>
+
+</article>
+
+<footer>
+  <div class="copy">&copy; 2026 OpenCyvis Contributors &middot; Apache 2.0</div>
+  <div class="links">
+    <a href="https://github.com/opencyvis/opencyvis-phone">GitHub</a>
+    <a href="index.html">Home</a>
+    <a href="https://x.com/flanker_hqd">X</a>
+    <a href="https://blog.flanker017.me">Blog</a>
+  </div>
+</footer>
+
+</body>
+</html>
