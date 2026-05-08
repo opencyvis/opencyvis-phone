@@ -5,12 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.content.pm.ApplicationInfo
-import android.os.Build
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
@@ -40,7 +36,6 @@ import ai.opencyvis.llm.LLMClientInterface
 import ai.opencyvis.llm.OllamaClient
 import ai.opencyvis.overlay.OverlayStatePolicy
 import ai.opencyvis.ui.MessageType
-import ai.opencyvis.voice.VoiceInputTestBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -69,7 +64,6 @@ class AgentService : Service() {
         private const val HANDOFF_TIMEOUT_MS = 30_000L
         private const val HANDOFF_COUNTDOWN_SECONDS = 10
         private const val HANDOFF_SAMPLE_INTERVAL_MS = 1_000L
-        const val ACTION_TEST = "ai.opencyvis.TEST"
         const val EXTRA_FOCUS_ASK = "focus_ask_user"
         const val EXTRA_SHOW_HANDOFF = "show_handoff"
     }
@@ -82,64 +76,6 @@ class AgentService : Service() {
         private set
 
     private val mainHandler = Handler(Looper.getMainLooper())
-
-    /**
-     * Test-only broadcast receiver. Allows adb to drive the agent:
-     *   adb shell am broadcast -a ai.opencyvis.TEST --es instruction "dial jimmy"
-     *   adb shell am broadcast -a ai.opencyvis.TEST --es answer "66666"
-     */
-    private val testReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (!isDebuggableBuild()) {
-                Log.w(TAG, "Ignoring TEST broadcast on non-debuggable build")
-                return
-            }
-            intent.getStringExtra("instruction")?.let { instr ->
-                Log.i(TAG, "TEST broadcast: startAgent($instr)")
-                startAgent(instr)
-            }
-            intent.getStringExtra("answer")?.let { ans ->
-                Log.i(TAG, "TEST broadcast: submitUserResponse($ans)")
-                submitUserResponse(ans)
-            }
-            intent.getStringExtra("supplement")?.let { text ->
-                Log.i(TAG, "TEST broadcast: submitUserSupplement($text)")
-                submitUserSupplement(text)
-            }
-            intent.getStringExtra("askuser")?.let { q ->
-                Log.i(TAG, "TEST broadcast: debugSimulateAskUser($q)")
-                engine?.debugSimulateAskUser(q)
-            }
-            intent.getStringExtra("handoff")?.let { reason ->
-                Log.i(TAG, "TEST broadcast: debugSimulateHandoff($reason)")
-                engine?.debugSimulateHandoff(reason)
-            }
-            intent.getStringExtra("debug")?.let { command ->
-                Log.i(TAG, "TEST broadcast: debug=$command")
-                when (command) {
-                    "running" -> debugStartRunningAgent()
-                    "view" -> enterViewMode()
-                    "takeover" -> enterTakeoverMode()
-                    "return_control" -> exitTakeoverMode()
-                    "stop" -> stopAgent()
-                    "repeat_type_text_block" -> debugRepeatGuardTypeText()
-                    "repeat_tap_block" -> debugRepeatGuardTapBlocked()
-                    "repeat_tap_allow" -> debugRepeatGuardTapAllowed()
-                    else -> Log.w(TAG, "Unknown debug command: $command")
-                }
-            }
-            intent.getStringExtra(VoiceInputTestBridge.EXTRA_RESULT)?.let { result ->
-                val target = intent.getStringExtra(VoiceInputTestBridge.EXTRA_TARGET)
-                    ?: VoiceInputTestBridge.TARGET_COMMAND
-                Log.i(TAG, "TEST broadcast: voice_result target=$target text=$result")
-                sendBroadcast(Intent(VoiceInputTestBridge.ACTION).apply {
-                    setPackage(packageName)
-                    putExtra(VoiceInputTestBridge.EXTRA_TARGET, target)
-                    putExtra(VoiceInputTestBridge.EXTRA_RESULT, result)
-                })
-            }
-        }
-    }
 
     private var engine: AgentEngine? = null
 
@@ -183,18 +119,12 @@ class AgentService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        App.agentService = this
         config = ConfigRepository(this)
         historyRepo = ChatHistoryRepository(this)
         memoryRepo = GlobalMemoryRepository(this)
         createNotificationChannel()
         ensureAccessibilityServiceEnabled()
-        val filter = IntentFilter(ACTION_TEST)
-        if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(testReceiver, filter, RECEIVER_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(testReceiver, filter)
-        }
         Log.i(TAG, "AgentService created")
     }
 
@@ -212,7 +142,7 @@ class AgentService : Service() {
     }
 
     override fun onDestroy() {
-        unregisterReceiver(testReceiver)
+        App.agentService = null
         taskDisplayGuard?.stop()
         taskDisplayGuard = null
         handoffObserverJob?.cancel()
@@ -374,11 +304,7 @@ class AgentService : Service() {
         override fun shutdown() {}
     }
 
-    private fun isDebuggableBuild(): Boolean {
-        return (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-    }
-
-    private fun debugStartRunningAgent() {
+    internal fun debugStartRunningAgent() {
         if (displayState != DisplayState.CHAT) {
             returnToChat()
         }
@@ -443,7 +369,7 @@ class AgentService : Service() {
         Log.i(TAG, "Debug running agent ready on display ${vdm.displayId}")
     }
 
-    private fun debugRepeatGuardTypeText() {
+    internal fun debugRepeatGuardTypeText() {
         val guard = ActionRepeatGuard()
         val screen = ScreenFingerprint(0x0f0f0f0f0f0f0f0fL)
         guard.recordExecuted(ai.opencyvis.action.Action.TypeText("京东"), screen)
@@ -455,7 +381,7 @@ class AgentService : Service() {
         }
     }
 
-    private fun debugRepeatGuardTapBlocked() {
+    internal fun debugRepeatGuardTapBlocked() {
         val guard = ActionRepeatGuard()
         val screen = ScreenFingerprint(0x1111111111111111L)
         guard.recordExecuted(ai.opencyvis.action.Action.Tap(500, 600), screen)
@@ -467,7 +393,7 @@ class AgentService : Service() {
         }
     }
 
-    private fun debugRepeatGuardTapAllowed() {
+    internal fun debugRepeatGuardTapAllowed() {
         val guard = ActionRepeatGuard()
         val screen = ScreenFingerprint(0x1111111111111111L)
         guard.recordExecuted(ai.opencyvis.action.Action.Tap(500, 600), screen)
