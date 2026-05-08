@@ -312,4 +312,97 @@ class ToolSchemaTest {
         assertEquals("string", properties.getJSONObject("memory_value").getString("type"))
         assertEquals("string", properties.getJSONObject("memory_category").getString("type"))
     }
+
+    // ==========================================================================
+    // Golden tests against the real ToolSchema
+    // ==========================================================================
+
+    @Test
+    fun `all action_type enum values are present in real schema`() {
+        val expectedActions = setOf(
+            "tap", "open_app", "swipe", "key_event", "type_text",
+            "wait", "finish", "fail", "ask_user", "handoff_user", "note", "remember"
+        )
+
+        val enumArray = actualProperties()
+            .getJSONObject("action_type")
+            .getJSONArray("enum")
+
+        val actualActions = (0 until enumArray.length()).map { enumArray.getString(it) }.toSet()
+
+        assertEquals(
+            "Schema action_type enum must exactly match expected set",
+            expectedActions,
+            actualActions
+        )
+    }
+
+    @Test
+    fun `tap requires x and y integer parameters`() {
+        val props = actualProperties()
+        assertTrue("Schema must have x property", props.has("x"))
+        assertTrue("Schema must have y property", props.has("y"))
+        assertEquals("integer", props.getJSONObject("x").getString("type"))
+        assertEquals("integer", props.getJSONObject("y").getString("type"))
+    }
+
+    @Test
+    fun `swipe requires direction parameter with correct enum`() {
+        val props = actualProperties()
+        assertTrue("Schema must have direction property", props.has("direction"))
+        val dirEnum = props.getJSONObject("direction").getJSONArray("enum")
+        val directions = (0 until dirEnum.length()).map { dirEnum.getString(it) }.toSet()
+        assertEquals(setOf("up", "down", "left", "right"), directions)
+    }
+
+    @Test
+    fun `type_text requires text string parameter`() {
+        val props = actualProperties()
+        assertTrue("Schema must have text property", props.has("text"))
+        assertEquals("string", props.getJSONObject("text").getString("type"))
+    }
+
+    @Test
+    fun `open_app requires app_name string parameter`() {
+        val props = actualProperties()
+        assertTrue("Schema must have app_name property", props.has("app_name"))
+        assertEquals("string", props.getJSONObject("app_name").getString("type"))
+    }
+
+    @Test
+    fun `real schema is valid JSON when serialized and reparsed`() {
+        val schema = ToolSchema.phoneActionTool()
+        val serialized = schema.toString()
+        val reparsed = JSONObject(serialized)
+
+        // Verify the round-tripped schema still has essential structure
+        assertEquals("function", reparsed.getString("type"))
+        val function = reparsed.getJSONObject("function")
+        assertEquals("phone_action", function.getString("name"))
+        assertTrue(function.has("description"))
+        assertTrue(function.has("parameters"))
+        val params = function.getJSONObject("parameters")
+        assertEquals("object", params.getString("type"))
+        assertTrue(params.has("properties"))
+        assertTrue(params.has("required"))
+    }
+
+    @Test
+    fun `toolsArray returns non-empty JSONArray`() {
+        val tools = ToolSchema.toolsArray()
+        assertTrue("toolsArray() should return at least one tool", tools.length() > 0)
+
+        // The first element should be our phone_action tool
+        val firstTool = tools.getJSONObject(0)
+        assertEquals("function", firstTool.getString("type"))
+        assertEquals("phone_action", firstTool.getJSONObject("function").getString("name"))
+    }
+
+    @Test
+    fun `toolsArray is parseable as JSON string`() {
+        val tools = ToolSchema.toolsArray()
+        val serialized = tools.toString()
+        val reparsed = JSONArray(serialized)
+        assertEquals(tools.length(), reparsed.length())
+    }
 }

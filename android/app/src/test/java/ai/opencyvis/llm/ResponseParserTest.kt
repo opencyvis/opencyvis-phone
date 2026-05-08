@@ -294,4 +294,236 @@ class ResponseParserTest {
         assertNotNull("Should find function_call in output", functionCall)
         assertEquals("phone_action", functionCall!!.getString("name"))
     }
+
+    // ==========================================================================
+    // Tests that call the REAL ResponseParser methods
+    // ==========================================================================
+
+    // --- extractJsonFromText ---
+
+    @Test
+    fun `extractJsonFromText parses markdown fenced JSON`() {
+        val text = """Here is my action:
+```json
+{"thought":"opening settings","action_type":"tap","x":500,"y":300,"completed":false}
+```
+That should do it."""
+        val result = ResponseParser.extractJsonFromText(text)
+        assertNotNull("Should extract JSON from markdown fence", result)
+        assertEquals("tap", result!!["action_type"])
+        assertEquals(500, result["x"])
+        assertEquals(300, result["y"])
+        assertEquals("opening settings", result["thought"])
+        assertEquals(false, result["completed"])
+    }
+
+    @Test
+    fun `extractJsonFromText parses plain JSON in text`() {
+        val text = """I will tap the button. {"thought":"tapping","action_type":"tap","x":100,"y":200,"completed":false} Done."""
+        val result = ResponseParser.extractJsonFromText(text)
+        assertNotNull("Should extract JSON from plain text", result)
+        assertEquals("tap", result!!["action_type"])
+        assertEquals(100, result["x"])
+        assertEquals(200, result["y"])
+    }
+
+    @Test
+    fun `extractJsonFromText parses standalone JSON string`() {
+        val text = """{"thought":"done","action_type":"finish","completed":true}"""
+        val result = ResponseParser.extractJsonFromText(text)
+        assertNotNull(result)
+        assertEquals("finish", result!!["action_type"])
+        assertEquals(true, result["completed"])
+    }
+
+    // --- extractFieldsFromMalformedJson ---
+
+    @Test
+    fun `extractFieldsFromMalformedJson handles truncated JSON`() {
+        val truncated = """{"thought":"starting the app","action_type":"open_app","app_name":"Settings","completed":false"""
+        val result = ResponseParser.extractFieldsFromMalformedJson(truncated)
+        assertNotNull("Should extract fields from truncated JSON", result)
+        assertEquals("open_app", result!!["action_type"])
+        assertEquals("Settings", result["app_name"])
+        assertEquals(false, result["completed"])
+    }
+
+    @Test
+    fun `extractFieldsFromMalformedJson handles extra commas`() {
+        val malformed = """{"thought":"swiping up","action_type":"swipe",,"direction":"up",,"completed":false,}"""
+        val result = ResponseParser.extractFieldsFromMalformedJson(malformed)
+        assertNotNull("Should extract fields despite extra commas", result)
+        assertEquals("swipe", result!!["action_type"])
+        assertEquals("up", result["direction"])
+        assertEquals(false, result["completed"])
+    }
+
+    @Test
+    fun `extractFieldsFromMalformedJson returns null for no action_type`() {
+        val noAction = """{"thought":"just thinking"}"""
+        val result = ResponseParser.extractFieldsFromMalformedJson(noAction)
+        assertNull("Should return null when action_type is absent", result)
+    }
+
+    // --- Unicode in action parameters ---
+
+    @Test
+    fun `extractJsonFromText handles unicode in parameters`() {
+        val text = """{"thought":"输入中文文本","action_type":"type_text","text":"你好世界","completed":false}"""
+        val result = ResponseParser.extractJsonFromText(text)
+        assertNotNull("Should handle unicode text", result)
+        assertEquals("type_text", result!!["action_type"])
+        assertEquals("你好世界", result["text"])
+        assertEquals("输入中文文本", result["thought"])
+    }
+
+    @Test
+    fun `extractJsonFromText handles emoji in text field`() {
+        val text = """{"thought":"typing emoji","action_type":"type_text","text":"Hello 🌍🎉","completed":false}"""
+        val result = ResponseParser.extractJsonFromText(text)
+        assertNotNull(result)
+        assertEquals("type_text", result!!["action_type"])
+        assertEquals("Hello 🌍🎉", result["text"])
+    }
+
+    // --- Empty / null fields ---
+
+    @Test
+    fun `extractJsonFromText handles empty string fields`() {
+        val text = """{"thought":"","action_type":"wait","completed":false}"""
+        val result = ResponseParser.extractJsonFromText(text)
+        assertNotNull(result)
+        assertEquals("wait", result!!["action_type"])
+        assertEquals("", result["thought"])
+    }
+
+    @Test
+    fun `extractJsonFromText handles null fields`() {
+        val text = """{"thought":"testing null","action_type":"tap","x":100,"y":200,"app_name":null,"completed":false}"""
+        val result = ResponseParser.extractJsonFromText(text)
+        assertNotNull(result)
+        assertEquals("tap", result!!["action_type"])
+        assertNull("null JSON value should become null", result["app_name"])
+    }
+
+    @Test
+    fun `jsonObjectToMap converts null values`() {
+        val json = JSONObject()
+        json.put("key1", "value1")
+        json.put("key2", JSONObject.NULL)
+        val map = ResponseParser.jsonObjectToMap(json)
+        assertEquals("value1", map["key1"])
+        assertNull(map["key2"])
+    }
+
+    // --- parse() with OpenAI tool_calls format ---
+
+    @Test
+    fun `parse handles OpenAI chat completions tool_calls format`() {
+        val response = JSONObject().apply {
+            put("id", "chatcmpl-test123")
+            put("choices", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("index", 0)
+                    put("message", JSONObject().apply {
+                        put("role", "assistant")
+                        put("tool_calls", JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("id", "call_abc123")
+                                put("type", "function")
+                                put("function", JSONObject().apply {
+                                    put("name", "phone_action")
+                                    put("arguments", """{"thought":"I see the home screen","action_type":"tap","x":540,"y":960,"completed":false}""")
+                                })
+                            })
+                        })
+                    })
+                    put("finish_reason", "tool_calls")
+                })
+            })
+        }
+
+        val result = ResponseParser.parse(response)
+        assertNotNull("Should parse OpenAI tool_calls format", result)
+        assertEquals("tap", result!!["action_type"])
+        assertEquals(540, result["x"])
+        assertEquals(960, result["y"])
+        assertEquals(false, result["completed"])
+        assertEquals("I see the home screen", result["thought"])
+    }
+
+    // --- parse() with text-only response (no tool calls) ---
+
+    @Test
+    fun `parse handles text-only response via chat completions`() {
+        val response = JSONObject().apply {
+            put("id", "chatcmpl-text")
+            put("choices", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("index", 0)
+                    put("message", JSONObject().apply {
+                        put("role", "assistant")
+                        put("content", """{"thought":"no tool call","action_type":"wait","completed":false}""")
+                    })
+                    put("finish_reason", "stop")
+                })
+            })
+        }
+
+        val result = ResponseParser.parse(response)
+        assertNotNull("Should fall back to parsing JSON from content", result)
+        assertEquals("wait", result!!["action_type"])
+        assertEquals(false, result["completed"])
+    }
+
+    @Test
+    fun `parse handles Responses API text-only message`() {
+        val response = JSONObject().apply {
+            put("id", "resp_text_only")
+            put("output", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("type", "message")
+                    put("content", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("type", "output_text")
+                            put("text", """{"thought":"waiting","action_type":"wait","completed":false}""")
+                        })
+                    })
+                })
+            })
+        }
+
+        val result = ResponseParser.parse(response)
+        assertNotNull("Should extract JSON from text message in Responses API", result)
+        assertEquals("wait", result!!["action_type"])
+    }
+
+    @Test
+    fun `parse returns null for empty response`() {
+        val response = JSONObject().apply {
+            put("id", "resp_empty")
+        }
+        val result = ResponseParser.parse(response)
+        assertNull("Should return null for response with no output or choices", result)
+    }
+
+    @Test
+    fun `parse handles Responses API function_call`() {
+        val response = JSONObject().apply {
+            put("id", "resp_fc")
+            put("output", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("type", "function_call")
+                    put("name", "phone_action")
+                    put("arguments", """{"thought":"opening app","action_type":"open_app","app_name":"Chrome","completed":false}""")
+                })
+            })
+        }
+
+        val result = ResponseParser.parse(response)
+        assertNotNull(result)
+        assertEquals("open_app", result!!["action_type"])
+        assertEquals("Chrome", result["app_name"])
+        assertEquals(false, result["completed"])
+    }
 }
