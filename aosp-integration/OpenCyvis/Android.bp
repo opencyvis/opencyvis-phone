@@ -1,0 +1,8 @@
+android_app_import {
+    name: "OpenCyvis",
+    apk: "OpenCyvis.apk",
+    certificate: "platform",
+    privileged: true,
+    system_ext_specific: true,
+    presigned: false,
+}
