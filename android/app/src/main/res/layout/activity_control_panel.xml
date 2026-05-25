@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#FF0D0D0D"
+    android:background="@color/surface"
     android:fitsSystemWindows="true">
 
     <!-- Status bar -->
@@ -31,20 +31,9 @@
             android:layout_weight="1"
             android:text="OpenCyvis"
             android:textSize="18sp"
-            android:textColor="#E0FFFFFF"
+            android:textColor="@color/on_surface"
             android:fontFamily="sans-serif-medium"
             android:letterSpacing="0.02" />
-
-        <Button
-            android:id="@+id/btn_minimize"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:text="▢"
-            android:textSize="18sp"
-            android:minWidth="44dp"
-            style="?android:attr/buttonBarButtonStyle"
-            android:contentDescription="@string/vd_cd_minimize"
-            android:textColor="#80FFFFFF" />
 
         <Button
             android:id="@+id/btn_history"
@@ -54,17 +43,17 @@
             android:textSize="18sp"
             android:minWidth="44dp"
             style="?android:attr/buttonBarButtonStyle"
-            android:textColor="#80FFFFFF" />
+            android:textColor="@color/on_surface_medium" />
 
         <Button
             android:id="@+id/btn_memory"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:text="@string/btn_memory_label"
-            android:textSize="15sp"
+            android:text="🧠"
+            android:textSize="18sp"
             android:minWidth="44dp"
             style="?android:attr/buttonBarButtonStyle"
-            android:textColor="#80FFFFFF" />
+            android:textColor="@color/on_surface_medium" />
 
         <Button
             android:id="@+id/btn_settings"
@@ -74,21 +63,21 @@
             android:textSize="18sp"
             android:minWidth="44dp"
             style="?android:attr/buttonBarButtonStyle"
-            android:textColor="#80FFFFFF" />
+            android:textColor="@color/on_surface_medium" />
     </LinearLayout>
 
     <!-- Subtle divider -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#1AFFFFFF" />
+        android:background="@color/surface_overlay_10" />
 
-    <!-- Recent tasks (shown when idle, hidden when agent active) -->
+    <!-- Main content area -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#FF0D0D0D">
+        android:background="@color/surface">
 
         <!-- Chat messages -->
         <androidx.recyclerview.widget.RecyclerView
@@ -98,43 +87,126 @@
             android:padding="16dp"
             android:clipToPadding="false" />
 
-        <!-- Idle state: recent tasks -->
-        <LinearLayout
-            android:id="@+id/recent_tasks_container"
+        <!-- Idle state: greeting + routines -->
+        <ScrollView
+            android:id="@+id/routines_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:visibility="gone">
+            android:visibility="gone"
+            android:fillViewport="true">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Recent Tasks"
-                android:textColor="#555555"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:letterSpacing="0.1"
-                android:layout_marginBottom="10dp" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recycler_recent_tasks"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:clipToPadding="false" />
-
-            <TextView
-                android:id="@+id/btn_view_all_history"
-                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:text="View all history →"
-                android:textColor="#80A0FF"
-                android:textSize="12sp"
-                android:padding="12dp"
-                android:layout_marginTop="4dp" />
-        </LinearLayout>
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <!-- Greeting section -->
+                <TextView
+                    android:id="@+id/text_greeting"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/greeting_morning"
+                    android:textColor="@color/on_surface"
+                    android:textSize="28sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/greeting_subtitle"
+                    android:textColor="@color/on_surface_medium"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="32dp" />
+
+                <!-- Recommended routine card -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/section_recommended"
+                    android:textColor="@color/text_caption"
+                    android:textSize="12sp"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.1"
+                    android:layout_marginBottom="12dp" />
+
+                <LinearLayout
+                    android:id="@+id/card_recommended"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_recommended_card"
+                    android:padding="16dp"
+                    android:layout_marginBottom="24dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <TextView
+                        android:id="@+id/recommended_icon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="28sp"
+                        android:layout_marginBottom="8dp" />
+
+                    <TextView
+                        android:id="@+id/recommended_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/on_surface"
+                        android:textSize="16sp"
+                        android:fontFamily="sans-serif-medium" />
+
+                    <TextView
+                        android:id="@+id/recommended_desc"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/on_surface_medium"
+                        android:textSize="13sp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <!-- Quick actions section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/section_quick_actions"
+                    android:textColor="@color/text_caption"
+                    android:textSize="12sp"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.1"
+                    android:layout_marginBottom="12dp" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_routine_chips"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never" />
+
+                <!-- Recent routines section -->
+                <TextView
+                    android:id="@+id/label_recent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/section_recent"
+                    android:textColor="@color/text_caption"
+                    android:textSize="12sp"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.1"
+                    android:layout_marginBottom="12dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/container_recent_routines"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </ScrollView>
     </FrameLayout>
 
     <!-- Bottom input bar -->
@@ -143,7 +215,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="#FF141414"
+        android:background="@color/surface_container"
         android:paddingHorizontal="16dp"
         android:paddingTop="8dp"
         android:paddingBottom="12dp">
@@ -167,7 +239,7 @@
                 android:layout_marginEnd="6dp"
                 android:text="View"
                 android:textSize="13sp"
-                android:textColor="#B0FFFFFF"
+                android:textColor="@color/on_surface_medium"
                 android:background="@drawable/bg_action_btn"
                 android:textAllCaps="false" />
 
@@ -180,7 +252,7 @@
                 android:layout_marginStart="6dp"
                 android:text="Stop"
                 android:textSize="13sp"
-                android:textColor="#EF4444"
+                android:textColor="@color/color_danger"
                 android:background="@drawable/bg_action_btn_danger"
                 android:textAllCaps="false" />
         </LinearLayout>
@@ -203,8 +275,8 @@
                 android:background="@drawable/bg_input_field"
                 android:paddingHorizontal="20dp"
                 android:textSize="15sp"
-                android:textColor="#E0FFFFFF"
-                android:textColorHint="#40FFFFFF"
+                android:textColor="@color/on_surface"
+                android:textColorHint="@color/on_surface_hint"
                 android:maxLines="1"
                 android:fontFamily="sans-serif" />
 
@@ -216,7 +288,7 @@
                 android:layout_marginEnd="8dp"
                 android:text="🎙"
                 android:textSize="16sp"
-                android:textColor="#B0FFFFFF"
+                android:textColor="@color/on_surface_medium"
                 android:background="@drawable/bg_action_btn"
                 android:padding="0dp"
                 android:stateListAnimator="@null" />
@@ -228,7 +300,7 @@
                 android:layout_height="48dp"
                 android:text="▲"
                 android:textSize="16sp"
-                android:textColor="#FF0D0D0D"
+                android:textColor="@color/surface"
                 android:background="@drawable/bg_btn_send"
                 android:textStyle="bold"
                 android:padding="0dp" />

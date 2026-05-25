@@ -37,7 +37,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="OpenCyvis"
-            android:textColor="#FFFFFFFF"
+            android:textColor="@color/on_surface_full"
             android:textSize="12sp"
             android:fontFamily="sans-serif-medium"
             android:singleLine="true"
@@ -49,7 +49,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/overlay_running"
-            android:textColor="#B0FFFFFF"
+            android:textColor="@color/on_surface_medium"
             android:textSize="10sp"
             android:layout_marginTop="1dp"
             android:fontFamily="sans-serif" />
@@ -66,6 +66,6 @@
         android:scaleType="centerInside"
         android:padding="4dp"
         android:contentDescription="@string/overlay_stop"
-        app:tint="#FFef4444" />
+        app:tint="@color/color_danger" />
 
 </LinearLayout>

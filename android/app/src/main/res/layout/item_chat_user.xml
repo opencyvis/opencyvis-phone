@@ -11,7 +11,7 @@
         android:layout_gravity="end"
         android:maxWidth="280dp"
         android:background="@drawable/bg_bubble_user"
-        android:textColor="#F0FFFFFF"
+        android:textColor="@color/on_surface_high"
         android:textSize="14sp"
         android:lineSpacingMultiplier="1.25"
         android:paddingHorizontal="16dp"

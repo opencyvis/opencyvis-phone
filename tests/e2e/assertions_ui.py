@@ -76,6 +76,28 @@ class VdExists(Assertion):
         return f"VdExists(expected={self.expected})"
 
 
+class ImOutboundContains(Assertion):
+    """Assert that IM outbound ring contains a substring."""
+
+    def __init__(self, expected: str):
+        self.expected = expected
+
+    def evaluate(self, state: RunState, config: RunConfig) -> tuple[bool, str]:
+        from tests.e2e.adb_utils import adb_run
+        try:
+            adb_run("shell", "setenforce", "0", serial=config.serial)
+        except Exception:
+            pass
+        output = adb_run("shell", "dumpsys", "opencyvis", "im", "outbound",
+                         serial=config.serial, timeout=10)
+        if self.expected in output:
+            return True, f"im outbound contains: {self.expected!r}"
+        return False, f"im outbound missing: {self.expected!r}\nactual: {output[:300]}"
+
+    def __str__(self) -> str:
+        return f"ImOutboundContains({self.expected!r})"
+
+
 class ChatContains(Assertion):
     """Assert that the chat UI contains specific text via uiautomator dump."""
 

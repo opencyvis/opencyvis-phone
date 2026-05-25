@@ -29,7 +29,8 @@ import java.io.IOException
 
 class SherpaOnnxSpeechInputEngine(
     context: Context,
-    private val numThreads: Int = DEFAULT_NUM_THREADS
+    private val numThreads: Int = DEFAULT_NUM_THREADS,
+    private val downloadProgressListener: ((bytesRead: Long, totalBytes: Long) -> Unit)? = null
 ) : SpeechInputEngine {
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -163,6 +164,7 @@ class SherpaOnnxSpeechInputEngine(
         }
 
         val paths = ensureModelFiles()
+        setNativeLibDir(paths.modelDir)
         val config = recognizerConfig(paths, numThreads)
         loadNativeLibraries()
         val created = OnlineRecognizer(config = config)
@@ -183,19 +185,21 @@ class SherpaOnnxSpeechInputEngine(
 
     private fun ensureModelFiles(): SherpaOnnxModelFiles.Paths {
         val paths = SherpaOnnxModelFiles.paths(appContext.filesDir)
+        if (SherpaOnnxModelFiles.allFilesPresent(appContext.filesDir)) return paths
+
         if (!paths.modelDir.exists() && !paths.modelDir.mkdirs()) {
             throw IOException("Unable to create ASR model directory")
         }
 
-        for (fileName in SherpaOnnxModelFiles.requiredFiles) {
-            val target = File(paths.modelDir, fileName)
-            if (target.exists() && target.length() > 0L) continue
-            appContext.assets.open("${SherpaOnnxModelFiles.ASSET_DIR}/$fileName").use { input ->
-                target.outputStream().use { output ->
-                    input.copyTo(output)
+        AsrModelDownloader.downloadIfNeeded(
+            url = SherpaOnnxModelFiles.downloadUrl(),
+            targetDir = paths.modelDir,
+            listener = downloadProgressListener?.let { callback ->
+                AsrModelDownloader.ProgressListener { bytesRead, totalBytes ->
+                    mainHandler.post { callback(bytesRead, totalBytes) }
                 }
             }
-        }
+        )
 
         return paths
     }
@@ -263,13 +267,24 @@ class SherpaOnnxSpeechInputEngine(
 
         @Volatile
         private var nativeLibrariesLoaded = false
+        private var nativeLibDir: File? = null
+
+        fun setNativeLibDir(dir: File) {
+            nativeLibDir = dir
+        }
 
         private fun loadNativeLibraries() {
             if (nativeLibrariesLoaded) return
             synchronized(this) {
                 if (nativeLibrariesLoaded) return
-                System.loadLibrary("onnxruntime")
-                System.loadLibrary("sherpa-onnx-jni")
+                val libDir = nativeLibDir
+                if (libDir != null) {
+                    System.load(File(libDir, "libonnxruntime.so").absolutePath)
+                    System.load(File(libDir, "libsherpa-onnx-jni.so").absolutePath)
+                } else {
+                    System.loadLibrary("onnxruntime")
+                    System.loadLibrary("sherpa-onnx-jni")
+                }
                 nativeLibrariesLoaded = true
             }
         }

@@ -6,7 +6,7 @@
     android:gravity="center_vertical"
     android:paddingHorizontal="16dp"
     android:paddingVertical="10dp"
-    android:background="#E6141414">
+    android:background="@color/surface_banner">
 
     <TextView
         android:id="@+id/text_status"
@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="View mode"
-        android:textColor="#B0FFFFFF"
+        android:textColor="@color/on_surface_medium"
         android:textSize="13sp"
         android:fontFamily="sans-serif-medium"
         android:singleLine="true"
@@ -29,7 +29,7 @@
         android:textSize="12sp"
         android:minWidth="80dp"
         android:layout_marginEnd="8dp"
-        android:textColor="#FFCBA135"
+        android:textColor="@color/color_accent"
         android:background="@drawable/bg_action_btn"
         android:textAllCaps="false"
         android:stateListAnimator="@null" />
@@ -41,7 +41,7 @@
         android:text="Back"
         android:textSize="12sp"
         android:minWidth="60dp"
-        android:textColor="#B0FFFFFF"
+        android:textColor="@color/on_surface_medium"
         android:background="@drawable/bg_action_btn"
         android:textAllCaps="false"
         android:stateListAnimator="@null" />

@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="@color/surface">
 
     <!-- SurfaceView renders VD content full-screen -->
     <SurfaceView
@@ -44,7 +44,7 @@
         android:paddingHorizontal="24dp"
         android:paddingVertical="12dp"
         android:background="@drawable/banner_background"
-        android:textColor="#E0FFFFFF"
+        android:textColor="@color/on_surface"
         android:textSize="14sp"
         android:fontFamily="sans-serif-medium"
         android:visibility="gone"
@@ -71,7 +71,7 @@
             android:layout_marginEnd="16dp"
             android:layout_marginTop="-4dp"
             android:text="✕"
-            android:textColor="#50FFFFFF"
+            android:textColor="@color/on_surface_subtle"
             android:textSize="16sp"
             android:padding="4dp"
             android:clickable="true"
@@ -92,7 +92,7 @@
                 android:layout_height="wrap_content"
                 android:text="✓"
                 android:textSize="18sp"
-                android:textColor="#4ADE80"
+                android:textColor="@color/color_success"
                 android:layout_marginEnd="12dp"
                 android:layout_marginTop="1dp" />
 
@@ -101,7 +101,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textColor="#C0FFFFFF"
+                android:textColor="@color/on_surface_high"
                 android:textSize="14sp"
                 android:lineSpacingMultiplier="1.35"
                 android:fontFamily="sans-serif" />
@@ -127,7 +127,7 @@
                 android:paddingHorizontal="4dp"
                 android:text="@string/vd_btn_back"
                 android:textSize="13sp"
-                android:textColor="#B0FFFFFF"
+                android:textColor="@color/on_surface_medium"
                 android:background="@drawable/bg_action_btn"
                 android:textAllCaps="false"
                 android:stateListAnimator="@null" />
@@ -143,7 +143,7 @@
                 android:paddingHorizontal="4dp"
                 android:text="@string/vd_btn_take_over"
                 android:textSize="13sp"
-                android:textColor="#FFCBA135"
+                android:textColor="@color/color_accent"
                 android:background="@drawable/bg_action_btn"
                 android:textAllCaps="false"
                 android:stateListAnimator="@null" />
@@ -159,7 +159,7 @@
                 android:paddingHorizontal="4dp"
                 android:text="@string/vd_btn_stop"
                 android:textSize="13sp"
-                android:textColor="#EF4444"
+                android:textColor="@color/color_danger"
                 android:background="@drawable/bg_action_btn_danger"
                 android:textAllCaps="false"
                 android:stateListAnimator="@null" />
@@ -185,7 +185,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:textSize="20sp"
-            android:textColor="#FF0D0D0D"
+            android:textColor="@color/surface"
             android:text="▶" />
     </FrameLayout>
 
@@ -214,7 +214,7 @@
                 android:id="@+id/question_text"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#FFCBA135"
+                android:textColor="@color/color_accent"
                 android:textSize="14sp"
                 android:fontFamily="sans-serif-medium"
                 android:paddingBottom="10dp" />
@@ -235,8 +235,8 @@
                     android:textSize="14sp"
                     android:paddingHorizontal="16dp"
                     android:singleLine="true"
-                    android:textColor="#E0FFFFFF"
-                    android:textColorHint="#40FFFFFF"
+                    android:textColor="@color/on_surface"
+                    android:textColorHint="@color/on_surface_hint"
                     android:imeOptions="actionSend"
                     android:inputType="text" />
 
@@ -247,7 +247,7 @@
                     android:layout_marginStart="8dp"
                     android:text="🎙"
                     android:textSize="15sp"
-                    android:textColor="#B0FFFFFF"
+                    android:textColor="@color/on_surface_medium"
                     android:background="@drawable/bg_action_btn"
                     android:padding="0dp"
                     android:stateListAnimator="@null" />
@@ -259,7 +259,7 @@
                     android:layout_marginStart="8dp"
                     android:text="↑"
                     android:textSize="18sp"
-                    android:textColor="#FF0D0D0D"
+                    android:textColor="@color/surface"
                     android:background="@drawable/bg_btn_send"
                     android:textStyle="bold"
                     android:stateListAnimator="@null" />
@@ -280,7 +280,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/handoff_title"
-                android:textColor="#FFCBA135"
+                android:textColor="@color/color_accent"
                 android:textSize="14sp"
                 android:fontFamily="sans-serif-medium"
                 android:paddingBottom="6dp" />
@@ -289,7 +289,7 @@
                 android:id="@+id/handoff_reason"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#D0FFFFFF"
+                android:textColor="@color/on_surface_medium"
                 android:textSize="13sp"
                 android:lineSpacingMultiplier="1.25" />
 
@@ -298,7 +298,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:textColor="#9CC7FF"
+                android:textColor="@color/text_countdown"
                 android:textSize="13sp"
                 android:visibility="gone" />
 
@@ -320,7 +320,7 @@
                     android:minHeight="0dp"
                     android:text="@string/handoff_return_now"
                     android:textSize="13sp"
-                    android:textColor="#FF0D0D0D"
+                    android:textColor="@color/surface"
                     android:background="@drawable/bg_btn_send"
                     android:textAllCaps="false"
                     android:stateListAnimator="@null" />
@@ -335,7 +335,7 @@
                     android:minHeight="0dp"
                     android:text="@string/handoff_cancel_return"
                     android:textSize="13sp"
-                    android:textColor="#D0FFFFFF"
+                    android:textColor="@color/on_surface_medium"
                     android:background="@drawable/bg_action_btn"
                     android:textAllCaps="false"
                     android:stateListAnimator="@null" />
@@ -354,7 +354,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/supplement_info"
-                android:textColor="#B0FFFFFF"
+                android:textColor="@color/on_surface_medium"
                 android:textSize="13sp"
                 android:fontFamily="sans-serif-medium"
                 android:paddingBottom="10dp" />
@@ -375,8 +375,8 @@
                     android:textSize="14sp"
                     android:paddingHorizontal="16dp"
                     android:singleLine="true"
-                    android:textColor="#E0FFFFFF"
-                    android:textColorHint="#40FFFFFF"
+                    android:textColor="@color/on_surface"
+                    android:textColorHint="@color/on_surface_hint"
                     android:imeOptions="actionSend"
                     android:inputType="text" />
 
@@ -387,7 +387,7 @@
                     android:layout_marginStart="8dp"
                     android:text="↑"
                     android:textSize="18sp"
-                    android:textColor="#FF0D0D0D"
+                    android:textColor="@color/surface"
                     android:background="@drawable/bg_btn_send"
                     android:textStyle="bold"
                     android:stateListAnimator="@null" />
@@ -399,7 +399,7 @@
             android:id="@+id/panel_divider"
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#1AFFFFFF"
+            android:background="@color/surface_overlay_10"
             android:visibility="gone" />
 
         <!-- Control buttons row -->
@@ -423,7 +423,7 @@
                 android:paddingHorizontal="4dp"
                 android:text="@string/vd_btn_back"
                 android:textSize="13sp"
-                android:textColor="#B0FFFFFF"
+                android:textColor="@color/on_surface_medium"
                 android:background="@drawable/bg_action_btn"
                 android:textAllCaps="false"
                 android:stateListAnimator="@null" />
@@ -439,7 +439,7 @@
                 android:paddingHorizontal="4dp"
                 android:text="@string/vd_btn_minimize"
                 android:textSize="13sp"
-                android:textColor="#4ADE80"
+                android:textColor="@color/color_success"
                 android:background="@drawable/bg_action_btn"
                 android:textAllCaps="false"
                 android:contentDescription="@string/vd_cd_minimize"
@@ -456,7 +456,7 @@
                 android:paddingHorizontal="4dp"
                 android:text="@string/vd_btn_take_over"
                 android:textSize="13sp"
-                android:textColor="#FFCBA135"
+                android:textColor="@color/color_accent"
                 android:background="@drawable/bg_action_btn"
                 android:textAllCaps="false"
                 android:stateListAnimator="@null" />
@@ -472,7 +472,7 @@
                 android:paddingHorizontal="4dp"
                 android:text="@string/vd_btn_stop"
                 android:textSize="13sp"
-                android:textColor="#EF4444"
+                android:textColor="@color/color_danger"
                 android:background="@drawable/bg_action_btn_danger"
                 android:textAllCaps="false"
                 android:stateListAnimator="@null" />

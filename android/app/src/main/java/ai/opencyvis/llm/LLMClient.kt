@@ -66,6 +66,9 @@ class LLMClient(
                         put("temperature", TEMPERATURE)
                         put("tools", ToolSchema.toolsArray())
                         put("tool_choice", "required")
+                        if (model.contains("qwen3") || model.contains("qwq")) {
+                            put("enable_thinking", false)
+                        }
                         put("stream", true)
                     }
 
@@ -243,6 +246,7 @@ class LLMClient(
      * escaped quotes (e.g. \"iphone16pro\" decoded to bare "iphone16pro").
      */
     private fun parseFunctionCallArgs(argsStr: String): Map<String, Any?>? {
+        Log.d(TAG, "parseFunctionCallArgs raw: ${argsStr.take(500)}")
         // 1. Try direct JSON parse
         try {
             return ResponseParser.jsonObjectToMap(JSONObject(argsStr))

@@ -39,6 +39,7 @@ import ai.opencyvis.R
 import ai.opencyvis.engine.AgentState
 import ai.opencyvis.engine.HandoffUiState
 import ai.opencyvis.input.InputInjector
+import androidx.core.content.ContextCompat
 import ai.opencyvis.voice.SherpaOnnxSpeechInputEngine
 import ai.opencyvis.voice.VoiceInputController
 import ai.opencyvis.voice.VoiceInputTestBridge
@@ -190,7 +191,7 @@ class ViewActivity : AppCompatActivity() {
         resultMessage = findViewById(R.id.result_message)
 
         voiceAnswerController = VoiceInputController(
-            SherpaOnnxSpeechInputEngine(this),
+            SherpaOnnxSpeechInputEngine(this, downloadProgressListener = ::onAsrDownloadProgress),
             editTextTarget(answerInput),
             object : VoiceInputController.Listener {
                 override fun onListeningChanged(isListening: Boolean) {
@@ -199,6 +200,7 @@ class ViewActivity : AppCompatActivity() {
                 }
 
                 override fun onError(message: String) {
+                    dismissAsrDownloadDialog()
                     android.widget.Toast.makeText(this@ViewActivity, message, android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
@@ -626,6 +628,41 @@ class ViewActivity : AppCompatActivity() {
             }
         }
 
+    // ── ASR model download progress ─────────────────────────────────────
+
+    private var asrDownloadDialog: android.app.AlertDialog? = null
+    private var asrDownloadProgressBar: android.widget.ProgressBar? = null
+
+    private fun onAsrDownloadProgress(bytesRead: Long, totalBytes: Long) {
+        if (asrDownloadDialog == null) {
+            val bar = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                isIndeterminate = totalBytes <= 0
+                max = 100
+                setPadding(48, 32, 48, 16)
+            }
+            asrDownloadProgressBar = bar
+            asrDownloadDialog = android.app.AlertDialog.Builder(this)
+                .setTitle("Downloading speech model…")
+                .setMessage("~30 MB")
+                .setView(bar)
+                .setCancelable(false)
+                .show()
+        }
+        if (totalBytes > 0) {
+            asrDownloadProgressBar?.isIndeterminate = false
+            asrDownloadProgressBar?.progress = ((bytesRead * 100) / totalBytes).toInt()
+        }
+        if (totalBytes > 0 && bytesRead >= totalBytes) {
+            dismissAsrDownloadDialog()
+        }
+    }
+
+    private fun dismissAsrDownloadDialog() {
+        asrDownloadDialog?.dismiss()
+        asrDownloadDialog = null
+        asrDownloadProgressBar = null
+    }
+
     // ── Result Panel ─────────────────────────────────────────────────────
 
     private fun showResultPanel(message: String, isError: Boolean) {
@@ -634,10 +671,10 @@ class ViewActivity : AppCompatActivity() {
         resultMessage.text = message
         if (isError) {
             resultIcon.text = "✗"
-            resultIcon.setTextColor(android.graphics.Color.parseColor("#F44336"))
+            resultIcon.setTextColor(ContextCompat.getColor(this, R.color.color_danger))
         } else {
             resultIcon.text = "✓"
-            resultIcon.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+            resultIcon.setTextColor(ContextCompat.getColor(this, R.color.color_success))
         }
         resultPanel.visibility = View.VISIBLE
         resultPanel.translationY = resultPanel.height.toFloat().coerceAtLeast(300f)

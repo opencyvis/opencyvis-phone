@@ -57,6 +57,24 @@ class ChatHistoryRepository(context: Context) {
             dao.updateLastAgentStatus(conversationId, text, System.currentTimeMillis())
         }
 
+    suspend fun appendInbound(
+        conversationId: Long,
+        text: String,
+        source: String,
+        remoteChatId: String
+    ) = withContext(Dispatchers.IO) {
+        dao.insertMessage(
+            ChatMessageEntity(
+                conversationId = conversationId,
+                type = MessageType.USER_INPUT.name,
+                text = text,
+                timestamp = System.currentTimeMillis(),
+                source = source,
+                remoteChatId = remoteChatId
+            )
+        )
+    }
+
     suspend fun updateLastAgentStatusToResult(conversationId: Long) =
         withContext(Dispatchers.IO) {
             dao.updateLastMessageType(
@@ -66,4 +84,8 @@ class ChatHistoryRepository(context: Context) {
                 System.currentTimeMillis()
             )
         }
+
+    suspend fun markStaleRunningAsStopped() = withContext(Dispatchers.IO) {
+        dao.markStaleRunningAsStopped(System.currentTimeMillis())
+    }
 }

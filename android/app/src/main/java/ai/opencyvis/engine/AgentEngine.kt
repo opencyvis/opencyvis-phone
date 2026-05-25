@@ -39,7 +39,13 @@ class AgentEngine(
     private val virtualDisplayManager: VirtualDisplayManager? = null,
     private val debugMode: Boolean = false,
     private val memoryRepository: GlobalMemoryRepository? = null,
-    private val viewTreeProvider: ((Int, Int, Int) -> String?)? = null
+    private val viewTreeProvider: ((Int, Int, Int) -> String?)? = null,
+    private val shouldForwardScreenshot: (() -> Boolean)? = null,
+    private val onSaveRoutine: ((
+        name: String, icon: String, instruction: String,
+        scheduleType: String?, scheduleTime: String?, scheduleRepeat: String?,
+        scheduleInterval: Int?, scheduleLocation: String?, scheduleOnEnter: Boolean?
+    ) -> Unit)? = null,
 ) {
 
     companion object {
@@ -49,6 +55,7 @@ class AgentEngine(
         private const val VD_CAPTURE_MAX_ATTEMPTS = 8
         private const val VD_CAPTURE_RETRY_DELAY_MS = 300L
         private const val VD_IMAGE_READER_TIMEOUT_MS = 600L
+        private const val VD_CAPTURE_RECOVERY_THRESHOLD = 3  // Launch home on VD after this many failures
 
         /**
          * System prompt. Ported from cli_demo.py SYSTEM_PROMPT (lines 286-302).
@@ -66,8 +73,14 @@ class AgentEngine(
     private val _stepResults = MutableSharedFlow<StepResult>(replay = 0, extraBufferCapacity = 20)
     val stepResults: SharedFlow<StepResult> = _stepResults.asSharedFlow()
 
+    private val _stepScreenshots = MutableSharedFlow<ByteArray>(replay = 0, extraBufferCapacity = 5)
+    val stepScreenshots: SharedFlow<ByteArray> = _stepScreenshots.asSharedFlow()
+
     @Volatile
     private var paused = false
+
+    private var consecutiveBlackFrames = 0
+    private var lastNonBlackStep = 0
 
     @Volatile
     private var userResponseDeferred: CompletableDeferred<String?>? = null
@@ -173,6 +186,9 @@ class AgentEngine(
      * Main observe-think-act loop. Ported from cli_demo.py run_instruction().
      */
     private suspend fun runAgentLoop(instruction: String) {
+        consecutiveBlackFrames = 0
+        lastNonBlackStep = 0
+
         val messages = mutableListOf<Map<String, Any>>(
             mapOf("role" to "system", "content" to SYSTEM_PROMPT)
         )
@@ -181,11 +197,16 @@ class AgentEngine(
         var pendingActionFeedback: String? = null
         var prevViewTree: String? = null
         var prevActionType: String? = null
+        var prevScreenFingerprint: ScreenFingerprint? = null
+        var consecutiveUnchangedScreens = 0
 
         try {
-            // Wait for virtual display to render its first frame
+            // Wait for VD to stabilize after creation. Android may briefly route
+            // the calling app's activity to a new VD; the keyguard dismiss thread
+            // in PrivilegedService also needs ~600ms. The mirror cache drain
+            // (800ms after creation) clears stale frames.
             if (virtualDisplayManager != null) {
-                delay(500)
+                delay(1200)
             }
 
             for (step in 1..maxSteps) {
@@ -221,6 +242,11 @@ class AgentEngine(
                     }
                 }
 
+                if (shouldForwardScreenshot?.invoke() == true && screenshotBase64 != null) {
+                    val bytes = android.util.Base64.decode(screenshotBase64, android.util.Base64.DEFAULT)
+                    _stepScreenshots.tryEmit(bytes)
+                }
+
                 if (screenshotBase64 == null) {
                     _state.value = AgentState.Error("Failed to capture screenshot")
                     _stepResults.emit(
@@ -230,6 +256,48 @@ class AgentEngine(
                     return
                 }
                 val screenFingerprint = ScreenFingerprint.fromBase64(screenshotBase64)
+
+                // FLAG_SECURE detection: consecutive strictly-black frames indicate a
+                // privacy-protected screen. Use strict check (all sampled pixels == 0x000000)
+                // to avoid false positives from app transition animations which have
+                // status bar / navigation bar colors.
+                if (isBitmapStrictlyBlack(screenshotBase64)) {
+                    consecutiveBlackFrames++
+                    Log.d(TAG, "Strictly black frame detected ($consecutiveBlackFrames consecutive, lastNonBlack=$lastNonBlackStep)")
+                } else {
+                    consecutiveBlackFrames = 0
+                    lastNonBlackStep = step
+                }
+
+                // Trigger handoff if:
+                // - 3+ consecutive strictly-black frames (rules out transition animations)
+                // - Had a non-black frame before (not screen-off from start)
+                // - Not already on step 1 (rules out initial state issues)
+                if (consecutiveBlackFrames >= 3 && lastNonBlackStep > 0) {
+                    Log.i(TAG, "FLAG_SECURE handoff triggered at step $step")
+                    consecutiveBlackFrames = 0  // reset to prevent re-trigger if user resumes
+
+                    val reason = "I may not be able to see this screen — it appears to be privacy-protected. Please take over to handle this part."
+                    _state.value = AgentState.WaitingForHandoff(reason, step)
+                    _stepResults.emit(
+                        StepResult(step, "flag_secure_handoff", "Privacy-protected screen detected",
+                            true, reason, System.currentTimeMillis() - stepStartTime, false)
+                    )
+
+                    val deferred = CompletableDeferred<String?>()
+                    userHandoffDeferred = deferred
+                    val handoffSource = deferred.await()
+                    userHandoffDeferred = null
+
+                    if (handoffSource == null) {
+                        _state.value = AgentState.Idle()
+                        return
+                    }
+
+                    // After user returns control, check if still black
+                    pendingActionFeedback = "User returned control after privacy-protected screen."
+                    continue  // take fresh screenshot
+                }
 
                 // === VIEW TREE ===
                 val viewTree: String? = if (vdm != null && viewTreeProvider != null) {
@@ -244,15 +312,31 @@ class AgentEngine(
                     Log.i(TAG, "Step $step ViewTree: ${viewTree.length} chars, ${viewTree.lines().size} nodes")
                 }
 
-                // Detect unchanged screen after side-effect action
+                // Detect unchanged screen after side-effect action (viewTree-based)
                 if (step > 1 && prevActionType in SIDE_EFFECT_ACTIONS &&
                     prevViewTree != null && viewTree != null &&
                     prevViewTree == viewTree && pendingActionFeedback == null) {
                     pendingActionFeedback = String.format(
                         LlmPrompts.agentFeedback("screen_unchanged"), prevActionType
                     )
-                    Log.w(TAG, "Step $step: screen unchanged after $prevActionType action")
+                    Log.w(TAG, "Step $step: screen unchanged after $prevActionType action (viewTree)")
                 }
+
+                // Detect unchanged screen via ScreenFingerprint (works without accessibility service)
+                if (step > 1 && prevActionType in SIDE_EFFECT_ACTIONS && screenFingerprint != null) {
+                    val prev = prevScreenFingerprint
+                    if (prev != null && screenFingerprint.isSimilarTo(prev)) {
+                        consecutiveUnchangedScreens++
+                    } else {
+                        consecutiveUnchangedScreens = 0
+                    }
+                    if (consecutiveUnchangedScreens >= 3 && consecutiveUnchangedScreens % 3 == 0
+                        && pendingActionFeedback == null) {
+                        pendingActionFeedback = LlmPrompts.agentFeedback("screen_stuck")
+                        Log.w(TAG, "Step $step: screen stuck for $consecutiveUnchangedScreens steps (fingerprint)")
+                    }
+                }
+                prevScreenFingerprint = screenFingerprint
 
                 // Build user message — on step 1, hint that the VD may be blank
                 val t1 = System.currentTimeMillis()
@@ -300,7 +384,7 @@ class AgentEngine(
                 }
                 val llmMs = System.currentTimeMillis() - t2
 
-                Log.i(TAG, "Step $step LLM response: thought=${resultData["thought"]}, action_type=${resultData["action_type"]}, completed=${resultData["completed"]}, reason=${resultData["reason"]}, question=${resultData["question"]}")
+                Log.i(TAG, "Step $step LLM response: thought=${resultData["thought"]}, action_type=${resultData["action_type"]}, reason=${resultData["reason"]}, question=${resultData["question"]}")
                 val debugInfo = if (debugMode) formatDebugInfo(resultData) else null
 
                 val thought = resultData["thought"] as? String ?: ""
@@ -317,11 +401,6 @@ class AgentEngine(
                     Log.w(TAG, "Step $step: action_type missing, inferred '$actionType'. resultData=$resultData")
                 } else if (actionType == "unknown") {
                     Log.w(TAG, "Step $step: LLM returned unrecognized action_type. resultData=$resultData")
-                }
-                val completed = when (val raw = resultData["completed"]) {
-                    is Boolean -> raw
-                    is String -> raw.equals("true", ignoreCase = true)
-                    else -> false  // default to NOT completed — let the agent keep going
                 }
 
                 _state.value = AgentState.Running(step, thought)
@@ -340,9 +419,13 @@ class AgentEngine(
                     val totalMs = System.currentTimeMillis() - stepStartTime
                     Log.i(TAG, "Step $step TIMING: capture=${captureMs}ms encode=${encodeMs}ms llm=${llmMs}ms action=0ms total=${totalMs}ms [$actionType]")
                     Log.i(TAG, "Task completed at step $step [$actionType]: ${detail.take(100)}")
+                    val sugName = resultData["suggested_routine_name"] as? String
+                    val sugIcon = resultData["suggested_routine_icon"] as? String
                     _stepResults.emit(
                         StepResult(step, actionType, thought, actionType == "finish",
-                            detail, totalMs, true, debugInfo)
+                            detail, totalMs, true, debugInfo,
+                            suggestedRoutineName = sugName,
+                            suggestedRoutineIcon = sugIcon)
                     )
                     _state.value = if (actionType == "finish") {
                         AgentState.Idle(resultMessage = thought)
@@ -466,6 +549,41 @@ class AgentEngine(
                     continue
                 }
 
+                if (actionType == "save_routine") {
+                    val routineName = (resultData["routine_name"] as? String) ?: ""
+                    val routineIcon = (resultData["routine_icon"] as? String) ?: "⚡"
+                    val routineInstruction = (resultData["routine_instruction"] as? String) ?: instruction
+                    val scheduleType = resultData["schedule_type"] as? String
+                    val scheduleTime = resultData["schedule_time"] as? String
+                    val scheduleRepeat = resultData["schedule_repeat"] as? String
+                    val scheduleInterval = (resultData["schedule_interval"] as? Number)?.toInt()
+                    val scheduleLocation = resultData["schedule_location"] as? String
+                    val scheduleOnEnter = resultData["schedule_on_enter"] as? Boolean
+
+                    onSaveRoutine?.invoke(
+                        routineName, routineIcon, routineInstruction,
+                        scheduleType, scheduleTime, scheduleRepeat,
+                        scheduleInterval, scheduleLocation, scheduleOnEnter
+                    )
+
+                    val totalMs = System.currentTimeMillis() - stepStartTime
+                    val scheduleDesc = when (scheduleType) {
+                        "time" -> "@ $scheduleTime ${scheduleRepeat ?: "daily"}"
+                        "interval" -> "every ${scheduleInterval}min"
+                        "geofence" -> "${if (scheduleOnEnter != false) "arrive" else "leave"} $scheduleLocation"
+                        else -> ""
+                    }
+                    val desc = if (scheduleDesc.isNotEmpty()) "$routineName ($scheduleDesc)" else routineName
+                    Log.i(TAG, "Step $step: save_routine: $desc")
+                    _stepResults.emit(
+                        StepResult(step, actionType, thought, true,
+                            "Routine created: $desc", totalMs, true, debugInfo)
+                    )
+
+                    _state.value = AgentState.Idle(resultMessage = "Routine created: $desc")
+                    return
+                }
+
                 // === ACT ===
                 val t3 = System.currentTimeMillis()
                 val action = Action.fromMap(resultData)
@@ -503,15 +621,17 @@ class AgentEngine(
                 if (!stepResult.success) {
                     pendingActionFeedback = String.format(LlmPrompts.agentFeedback("action_failed"), stepResult.detail)
                     Log.w(TAG, "Step $step action failed, will feed back to LLM: ${stepResult.detail}")
+                } else if (actionType == "list_apps") {
+                    pendingActionFeedback = stepResult.detail
+                    Log.i(TAG, "Step $step list_apps result: ${stepResult.detail.take(200)}")
                 }
 
                 val actionMs = System.currentTimeMillis() - t3
 
                 val totalMs = System.currentTimeMillis() - stepStartTime
 
-                // Override completed from LLM response
                 val finalResult = stepResult.copy(
-                    completed = completed,
+                    completed = false,
                     durationMs = totalMs,
                     debugInfo = debugInfo
                 )
@@ -519,21 +639,10 @@ class AgentEngine(
 
                 Log.i(TAG, "Step $step TIMING: capture=${captureMs}ms encode=${encodeMs}ms llm=${llmMs}ms action=${actionMs}ms total=${totalMs}ms [$actionType]")
 
-                if (completed) {
-                    if (actionType in SIDE_EFFECT_ACTIONS) {
-                        Log.i(TAG, "Step $step: completed=true with side-effect action [$actionType], continuing one more step to verify")
-                        pendingActionFeedback = String.format(LlmPrompts.agentFeedback("completed_side_effect"), actionType)
-                    } else {
-                        Log.i(TAG, "Task completed at step $step [completed]: $thought")
-                        _state.value = AgentState.Idle(resultMessage = thought)
-                        return
-                    }
-                }
-
                 // Wait for screen update before next step
                 prevViewTree = viewTree
                 prevActionType = actionType
-                delay(1000)
+                delay(if (actionType == "open_app") 2000 else 1000)
 
                 // Trim conversation history
                 if (messages.size > MAX_HISTORY_MESSAGES) {
@@ -570,36 +679,54 @@ class AgentEngine(
      * 2. If ScreenCapture returns null (API <36) or all-black (FLAG_SECURE),
      *    fall back to ImageReader capture which reads directly from the VD's
      *    own surface and works on all API levels.
+     *
+     * Recovery: After 3 consecutive failures, launches home on the VD to ensure
+     * an Activity is rendered (fixes empty VD state after failed app launch).
      */
     private suspend fun captureVirtualDisplay(vdm: VirtualDisplayManager, step: Int): String? {
-        // Activity and ad-window transitions can briefly leave the VD without a
-        // readable frame. Retry before treating capture as a task-ending error.
         for (attempt in 1..VD_CAPTURE_MAX_ATTEMPTS) {
-            val bitmap = ScreenCapture.captureBitmap(displayId = vdm.displayId)
-            if (bitmap != null) {
-                if (!isBitmapBlack(bitmap)) {
-                    // Normal frame — use it
-                    return ScreenCapture.captureBase64(virtualDisplayBitmap = bitmap)
+            if (vdm.hasLocalDisplay) {
+                val irBitmap = withContext(Dispatchers.IO) {
+                    vdm.captureViaImageReader(timeoutMs = VD_IMAGE_READER_TIMEOUT_MS)
                 }
-                // Frame is all-black — likely FLAG_SECURE window
-                bitmap.recycle()
-                Log.w(TAG, "ScreenCapture returned black frame (FLAG_SECURE?), trying ImageReader fallback")
+                if (irBitmap != null) {
+                    Log.d(TAG, "Step $step: captured via local ImageReader (${irBitmap.width}x${irBitmap.height})")
+                    if (isBitmapBlack(irBitmap)) {
+                        Log.w(TAG, "ImageReader returned black frame (FLAG_SECURE?) — returning for handoff detection")
+                    }
+                    return ScreenCapture.captureBase64(virtualDisplayBitmap = irBitmap)
+                }
             } else {
-                // ScreenCapture API unavailable (API <36) — use ImageReader
-                Log.d(TAG, "ScreenCapture returned null for VD, trying ImageReader fallback")
+                Log.d(TAG, "Step $step: remote VD, skipping local ImageReader")
             }
 
-            // ImageReader fallback — works on all API levels
-            val irBitmap = withContext(Dispatchers.IO) {
-                vdm.captureViaImageReader(timeoutMs = VD_IMAGE_READER_TIMEOUT_MS)
+            // Fallback 1: backend capture via Binder
+            val backendBase64 = withContext(Dispatchers.IO) {
+                Log.d(TAG, "Step $step: trying backend capture (displayId=${vdm.displayId}, backend=${ScreenCapture.backend.javaClass.simpleName})")
+                ScreenCapture.captureBase64(displayId = vdm.displayId)
             }
-            if (irBitmap != null) {
-                Log.i(TAG, "ImageReader fallback succeeded for virtual display")
-                return ScreenCapture.captureBase64(virtualDisplayBitmap = irBitmap)
+            if (backendBase64 != null) {
+                Log.d(TAG, "Step $step: captured via backend (${backendBase64.length} chars)")
+                if (isBitmapLikelyBlack(backendBase64)) {
+                    Log.w(TAG, "Backend capture returned black frame (FLAG_SECURE?) — returning for handoff detection")
+                }
+                return backendBase64
             }
-            Log.w(TAG, "ImageReader fallback also returned null")
+            Log.w(TAG, "Step $step: backend capture returned null")
 
-            if (attempt < VD_CAPTURE_MAX_ATTEMPTS) {
+            // Recovery: after 3 failed attempts, launch home on VD to ensure content renders
+            if (attempt == VD_CAPTURE_RECOVERY_THRESHOLD) {
+                val topTask = vdm.getTopTaskIdOnDisplay(vdm.displayId)
+                if (topTask == null || topTask <= 0) {
+                    Log.w(TAG, "VD empty after $attempt capture failures, launching home")
+                    withContext(Dispatchers.IO) {
+                        ScreenCapture.backend.ensureVdHasContent(vdm.displayId)
+                    }
+                    delay(1000)  // Wait for home to render a frame
+                } else {
+                    Log.w(TAG, "VD has task $topTask but no new frame — using cached frame")
+                }
+            } else if (attempt < VD_CAPTURE_MAX_ATTEMPTS) {
                 Log.d(TAG, "VD capture failed at step $step (attempt $attempt/$VD_CAPTURE_MAX_ATTEMPTS), waiting ${VD_CAPTURE_RETRY_DELAY_MS}ms...")
                 delay(VD_CAPTURE_RETRY_DELAY_MS)
             }
@@ -633,6 +760,66 @@ class AgentEngine(
             if ((pixel and 0x00FFFFFF) != 0) return false
         }
         return true
+    }
+
+    /**
+     * Strict black check: ALL sampled pixels must be near-black (< 5 per channel).
+     * FLAG_SECURE returns pure black; transition animations have status/nav bar colors.
+     * Small threshold accounts for JPEG compression artifacts on pure black input.
+     */
+    private fun isBitmapStrictlyBlack(base64Jpeg: String): Boolean {
+        return try {
+            val bytes = android.util.Base64.decode(base64Jpeg, android.util.Base64.DEFAULT)
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return false
+            try {
+                val w = bitmap.width
+                val h = bitmap.height
+                if (w == 0 || h == 0) return true
+                val sampleCount = 20
+                for (i in 0 until sampleCount) {
+                    val x = (w * (i + 1)) / (sampleCount + 1)
+                    val y = (h * (i + 1)) / (sampleCount + 1)
+                    val pixel = bitmap.getPixel(x, y)
+                    val r = (pixel shr 16) and 0xFF
+                    val g = (pixel shr 8) and 0xFF
+                    val b = pixel and 0xFF
+                    if (r >= 5 || g >= 5 || b >= 5) return false
+                }
+                true
+            } finally {
+                bitmap.recycle()
+            }
+        } catch (_: Exception) { false }
+    }
+
+    /**
+     * Decode a base64 JPEG and check if the image is mostly black (90%+ dark pixels).
+     * Used to detect FLAG_SECURE screens where screenshots return black frames.
+     */
+    private fun isBitmapLikelyBlack(base64Jpeg: String): Boolean {
+        return try {
+            val bytes = android.util.Base64.decode(base64Jpeg, android.util.Base64.DEFAULT)
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return false
+            try {
+                // Sample 20 pixels across the image to check if it's mostly black
+                val w = bitmap.width
+                val h = bitmap.height
+                var darkPixels = 0
+                val sampleCount = 20
+                for (i in 0 until sampleCount) {
+                    val x = (w * (i + 1)) / (sampleCount + 1)
+                    val y = (h * (i + 1)) / (sampleCount + 1)
+                    val pixel = bitmap.getPixel(x, y)
+                    val r = (pixel shr 16) and 0xFF
+                    val g = (pixel shr 8) and 0xFF
+                    val b = pixel and 0xFF
+                    if (r < 15 && g < 15 && b < 15) darkPixels++
+                }
+                darkPixels >= sampleCount * 0.9  // 90%+ dark pixels = likely black
+            } finally {
+                bitmap.recycle()
+            }
+        } catch (_: Exception) { false }
     }
 
     /**

@@ -12,6 +12,7 @@ from tests.e2e.assertions_ui import (
     ChatContains,
     DumpsysAbsent,
     DumpsysContains,
+    ImOutboundContains,
     UiElement,
     UiText,
     VdExists,
@@ -39,7 +40,7 @@ def load_scenarios(
 def build_case(scenario: dict) -> Type[AgentTestCase]:
     """Dynamically build an AgentTestCase subclass from a scenario dict."""
     attrs: dict = {
-        "instruction": scenario["instruction"],
+        "instruction": scenario.get("instruction", ""),
         "timeout": scenario.get("timeout", 120),
         "max_steps": scenario.get("max_steps", 20),
         "mock_responses": scenario.get("mock_responses"),
@@ -48,6 +49,8 @@ def build_case(scenario: dict) -> Type[AgentTestCase]:
         "assertions": _build_assertions(scenario.get("verify", [])),
         "trigger_commands": _build_triggers(scenario.get("answers")),
         "user_answers": _build_user_answers(scenario.get("answers")),
+        "extra_deeplink_params": scenario.get("extra_deeplink_params"),
+        "skip_start_agent": scenario.get("skip_start_agent", False),
     }
 
     name = scenario.get("name", "DynamicScenario")
@@ -67,6 +70,8 @@ def _build_assertions(verify_list: list[dict]) -> list[Assertion]:
             assertions.append(DumpsysContains(item["dumpsys_contains"]))
         elif "dumpsys_absent" in item:
             assertions.append(DumpsysAbsent(item["dumpsys_absent"]))
+        elif "im_outbound_contains" in item:
+            assertions.append(ImOutboundContains(item["im_outbound_contains"]))
         elif "vd_exists" in item:
             assertions.append(VdExists(expected=bool(item["vd_exists"])))
         elif "chat_contains" in item:

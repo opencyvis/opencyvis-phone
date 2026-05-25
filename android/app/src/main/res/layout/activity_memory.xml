@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#FF0D0D0D"
+    android:background="@color/surface"
     android:fitsSystemWindows="true">
 
     <LinearLayout
@@ -22,7 +22,7 @@
             android:text="←"
             android:textSize="18sp"
             android:minWidth="44dp"
-            android:textColor="#80A0FF" />
+            android:textColor="@color/text_back_button" />
 
         <TextView
             android:layout_width="0dp"
@@ -30,7 +30,7 @@
             android:layout_weight="1"
             android:text="@string/memory_title"
             android:textSize="18sp"
-            android:textColor="#E0FFFFFF"
+            android:textColor="@color/on_surface"
             android:fontFamily="sans-serif-medium" />
 
         <Button
@@ -41,13 +41,13 @@
             android:text="+"
             android:textSize="20sp"
             android:minWidth="44dp"
-            android:textColor="#80A0FF" />
+            android:textColor="@color/text_back_button" />
     </LinearLayout>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#1AFFFFFF" />
+        android:background="@color/surface_overlay_10" />
 
     <EditText
         android:id="@+id/edit_search"
@@ -59,8 +59,8 @@
         android:inputType="text"
         android:maxLines="1"
         android:paddingHorizontal="18dp"
-        android:textColor="#E0FFFFFF"
-        android:textColorHint="#40FFFFFF"
+        android:textColor="@color/on_surface"
+        android:textColorHint="@color/on_surface_hint"
         android:textSize="14sp" />
 
     <androidx.recyclerview.widget.RecyclerView

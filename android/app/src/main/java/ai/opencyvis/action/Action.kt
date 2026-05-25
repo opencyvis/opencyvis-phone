@@ -43,7 +43,9 @@ sealed class Action(val typeName: String, open val thought: String) {
     ) : Action("wait", thought)
 
     data class Finish(
-        override val thought: String = ""
+        override val thought: String = "",
+        val suggestedRoutineName: String? = null,
+        val suggestedRoutineIcon: String? = null
     ) : Action("finish", thought)
 
     data class Fail(
@@ -73,29 +75,62 @@ sealed class Action(val typeName: String, open val thought: String) {
         override val thought: String = ""
     ) : Action("remember", thought)
 
+    data class ListApps(
+        val keyword: String = "",
+        override val thought: String = ""
+    ) : Action("list_apps", thought)
+
+    data class SaveRoutine(
+        val routineName: String,
+        val routineIcon: String,
+        val routineInstruction: String?,
+        val scheduleType: String?,
+        val scheduleTime: String?,
+        val scheduleRepeat: String?,
+        val scheduleInterval: Int?,
+        val scheduleLocation: String?,
+        val scheduleOnEnter: Boolean?,
+        override val thought: String = ""
+    ) : Action("save_routine", thought)
+
     companion object {
         /**
          * Parse an Action from the LLM tool call result map.
          */
+        private fun extractInt(value: Any?): Int? = when (value) {
+            is Number -> value.toInt()
+            is List<*> -> (value.firstOrNull() as? Number)?.toInt()
+            else -> null
+        }
+
+        private fun extractCoords(map: Map<String, Any?>): Pair<Int?, Int?> {
+            val xVal = map["x"]
+            val yVal = map["y"]
+            if (xVal is List<*> && xVal.size >= 2 && yVal == null) {
+                return Pair((xVal[0] as? Number)?.toInt(), (xVal[1] as? Number)?.toInt())
+            }
+            return Pair(extractInt(xVal), extractInt(yVal))
+        }
+
         fun fromMap(map: Map<String, Any?>): Action {
             val thought = (map["thought"] as? String) ?: ""
             val actionType = ((map["action_type"] as? String) ?: "fail").trim()
 
             return when (actionType) {
-                "tap" -> Tap(
-                    x = (map["x"] as? Number)?.toInt()
-                        ?: throw IllegalArgumentException("tap action missing required field 'x'"),
-                    y = (map["y"] as? Number)?.toInt()
-                        ?: throw IllegalArgumentException("tap action missing required field 'y'"),
-                    thought = thought
-                )
-                "long_press" -> LongPress(
-                    x = (map["x"] as? Number)?.toInt()
-                        ?: throw IllegalArgumentException("long_press action missing required field 'x'"),
-                    y = (map["y"] as? Number)?.toInt()
-                        ?: throw IllegalArgumentException("long_press action missing required field 'y'"),
-                    thought = thought
-                )
+                "tap" -> extractCoords(map).let { (cx, cy) ->
+                    Tap(
+                        x = cx ?: throw IllegalArgumentException("tap action missing required field 'x'"),
+                        y = cy ?: throw IllegalArgumentException("tap action missing required field 'y'"),
+                        thought = thought
+                    )
+                }
+                "long_press" -> extractCoords(map).let { (cx, cy) ->
+                    LongPress(
+                        x = cx ?: throw IllegalArgumentException("long_press action missing required field 'x'"),
+                        y = cy ?: throw IllegalArgumentException("long_press action missing required field 'y'"),
+                        thought = thought
+                    )
+                }
                 "open_app" -> OpenApp(
                     appName = (map["app_name"] as? String) ?: "",
                     thought = thought
@@ -113,7 +148,11 @@ sealed class Action(val typeName: String, open val thought: String) {
                     thought = thought
                 )
                 "wait" -> Wait(thought = thought)
-                "finish" -> Finish(thought = thought)
+                "finish" -> Finish(
+                    thought = thought,
+                    suggestedRoutineName = map["suggested_routine_name"] as? String,
+                    suggestedRoutineIcon = map["suggested_routine_icon"] as? String
+                )
                 "fail" -> Fail(
                     reason = (map["reason"] as? String) ?: "unknown reason",
                     thought = thought
@@ -134,6 +173,22 @@ sealed class Action(val typeName: String, open val thought: String) {
                     key = (map["memory_key"] as? String) ?: "",
                     value = (map["memory_value"] as? String) ?: "",
                     category = (map["memory_category"] as? String) ?: "",
+                    thought = thought
+                )
+                "list_apps" -> ListApps(
+                    keyword = (map["keyword"] as? String) ?: "",
+                    thought = thought
+                )
+                "save_routine" -> SaveRoutine(
+                    routineName = (map["routine_name"] as? String) ?: "",
+                    routineIcon = (map["routine_icon"] as? String) ?: "⚡",
+                    routineInstruction = map["routine_instruction"] as? String,
+                    scheduleType = map["schedule_type"] as? String,
+                    scheduleTime = map["schedule_time"] as? String,
+                    scheduleRepeat = map["schedule_repeat"] as? String,
+                    scheduleInterval = (map["schedule_interval"] as? Number)?.toInt(),
+                    scheduleLocation = map["schedule_location"] as? String,
+                    scheduleOnEnter = map["schedule_on_enter"] as? Boolean,
                     thought = thought
                 )
                 else -> Fail(reason = "Unknown action type: $actionType", thought = thought)

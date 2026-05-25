@@ -16,6 +16,8 @@ import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.animation.AccelerateDecelerateInterpolator
+import ai.opencyvis.backend.PrivilegeBackend
+import ai.opencyvis.backend.SystemBackend
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -36,7 +38,8 @@ internal class InputSequenceResult {
 class InputInjector(
     private val context: Context,
     private val displayId: Int = 0,
-    displaySize: Point? = null
+    displaySize: Point? = null,
+    private val backend: PrivilegeBackend = SystemBackend()
 ) {
 
     companion object {
@@ -124,10 +127,6 @@ class InputInjector(
     private val clipboardManager =
         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
-    // Cache reflection objects
-    private val inputManagerInstance: Any? by lazy { resolveInputManagerInstance() }
-    private val injectMethod: java.lang.reflect.Method? by lazy { resolveInjectMethod() }
-
     // Real touchscreen device ID for realistic MotionEvents (reference approach)
     private val touchDeviceId: Int by lazy {
         InputDevice.getDeviceIds()
@@ -155,37 +154,6 @@ class InputInjector(
         )
     }
 
-    private fun resolveInputManagerInstance(): Any? {
-        return try {
-            // API 36+: InputManager is a system service, no static getInstance()
-            val im = context.getSystemService(Context.INPUT_SERVICE)
-            if (im != null) return im
-
-            // Fallback: try legacy static getInstance()
-            val clazz = Class.forName("android.hardware.input.InputManager")
-            val getInstance = clazz.getMethod("getInstance")
-            getInstance.invoke(null)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get InputManager instance", e)
-            null
-        }
-    }
-
-    private fun resolveInjectMethod(): java.lang.reflect.Method? {
-        return try {
-            // Get the actual class of the instance for method lookup
-            val instance = inputManagerInstance ?: return null
-            instance.javaClass.getMethod(
-                "injectInputEvent",
-                InputEvent::class.java,
-                Int::class.javaPrimitiveType
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get injectInputEvent method via reflection", e)
-            null
-        }
-    }
-
     private fun injectEvent(event: InputEvent): Boolean {
         return injectEvent(event, INJECT_MODE_WAIT_FOR_FINISH)
     }
@@ -196,16 +164,7 @@ class InputInjector(
 
     private fun injectEvent(event: InputEvent, mode: Int): Boolean {
         return try {
-            if (displayId != 0) {
-                try {
-                    event.javaClass.getMethod("setDisplayId", Int::class.javaPrimitiveType)
-                        .invoke(event, displayId)
-                } catch (_: Exception) {}
-            }
-
-            val im = inputManagerInstance ?: return false
-            val method = injectMethod ?: return false
-            val injected = method.invoke(im, event, mode) as? Boolean ?: false
+            val injected = backend.injectInputEvent(event, displayId, mode)
             if (!injected) {
                 Log.w(TAG, "Input injection rejected: displayId=$displayId event=${event.javaClass.simpleName}")
             }
@@ -380,31 +339,15 @@ class InputInjector(
     }
 
     private fun typeViaClipboard(text: String): Boolean {
-        // Set clipboard
         clipboardManager.setPrimaryClip(ClipData.newPlainText("text", text))
 
-        // Simulate Ctrl+V
+        // KEYCODE_PASTE (279) is handled by Android framework (TextView.onKeyDown)
+        // directly — more reliable than Ctrl+V which depends on the focused view
+        // intercepting the key combo. Matches scrcpy's approach.
         val downTime = SystemClock.uptimeMillis()
-
-        val ctrlDown = KeyEvent(
-            downTime, downTime, KeyEvent.ACTION_DOWN,
-            KeyEvent.KEYCODE_CTRL_LEFT, 0, KeyEvent.META_CTRL_LEFT_ON or KeyEvent.META_CTRL_ON
-        )
-        val vDown = KeyEvent(
-            downTime, downTime + 10, KeyEvent.ACTION_DOWN,
-            KeyEvent.KEYCODE_V, 0, KeyEvent.META_CTRL_LEFT_ON or KeyEvent.META_CTRL_ON
-        )
-        val vUp = KeyEvent(
-            downTime, downTime + 20, KeyEvent.ACTION_UP,
-            KeyEvent.KEYCODE_V, 0, KeyEvent.META_CTRL_LEFT_ON or KeyEvent.META_CTRL_ON
-        )
-        val ctrlUp = KeyEvent(
-            downTime, downTime + 30, KeyEvent.ACTION_UP,
-            KeyEvent.KEYCODE_CTRL_LEFT, 0, 0
-        )
-
-        return injectEvent(ctrlDown) && injectEvent(vDown) &&
-                injectEvent(vUp) && injectEvent(ctrlUp)
+        val down = KeyEvent(downTime, downTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_PASTE, 0)
+        val up = KeyEvent(downTime, downTime + 50, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_PASTE, 0)
+        return injectEvent(down) && injectEvent(up)
     }
 
     /**

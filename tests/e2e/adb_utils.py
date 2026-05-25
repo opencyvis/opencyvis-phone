@@ -22,6 +22,9 @@ LOGCAT_FILTER = [
     "LLMClient:D",
     "AgentService:I",
     "TestShellCmd:I",
+    "PrivilegedService:D",
+    "PrivilegedServiceMain:I",
+    "CaptureOps:D",
 ]
 
 
@@ -210,6 +213,24 @@ def tap_ui_element(serial: Optional[str] = None, resource_id: str = "") -> bool:
     return True
 
 
+def tap_text_element(serial: Optional[str] = None, text: str = "") -> bool:
+    """Find element by text content in uiautomator dump and tap its center.
+
+    Returns True if element was found and tapped.
+    """
+    xml = uiautomator_dump(serial)
+    pattern = re.compile(
+        rf'text="{re.escape(text)}"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"'
+    )
+    m = pattern.search(xml)
+    if not m:
+        return False
+    x = (int(m.group(1)) + int(m.group(3))) // 2
+    y = (int(m.group(2)) + int(m.group(4))) // 2
+    adb_run("shell", "input", "tap", str(x), str(y), serial=serial)
+    return True
+
+
 def execute_steps(serial: Optional[str] = None, steps: Optional[list[str]] = None) -> None:
     """Execute a list of test step commands (DSL from scenarios.yml)."""
     if not steps:
@@ -218,6 +239,9 @@ def execute_steps(serial: Optional[str] = None, steps: Optional[list[str]] = Non
         if step.startswith("tap_ui:"):
             rid = step[len("tap_ui:"):]
             tap_ui_element(serial, rid)
+        elif step.startswith("tap_text:"):
+            text = step[len("tap_text:"):]
+            tap_text_element(serial, text)
         elif step.startswith("sleep:"):
             time.sleep(float(step[len("sleep:"):]))
         elif step.startswith("sleep "):

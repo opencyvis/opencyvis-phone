@@ -3,11 +3,14 @@ package ai.opencyvis.ui
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import ai.opencyvis.R
 
-class ChatAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+class ChatAdapter(
+    private val onMessageLongClick: ((ChatMessage, View) -> Unit)? = null
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val data = ChatMessageList()
 
@@ -89,7 +92,19 @@ class ChatAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (holder) {
             is CycleViewHolder -> holder.bind(data.get(position))
-            is TextViewHolder -> holder.bind(data.get(position))
+            is TextViewHolder -> {
+                holder.bind(data.get(position))
+                val message = data.get(position)
+                // Add long-click listener for agent messages
+                if (message.type == MessageType.USER_INPUT) {
+                    holder.itemView.setOnLongClickListener { view ->
+                        onMessageLongClick?.invoke(message, view)
+                        true
+                    }
+                } else {
+                    holder.itemView.setOnLongClickListener(null)
+                }
+            }
         }
     }
 

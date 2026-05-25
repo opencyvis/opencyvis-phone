@@ -29,6 +29,12 @@
 #     - vd_exists:      verify virtual display is alive (true/false)
 #     - dumpsys_contains: run `dumpsys opencyvis` and verify output contains this string
 #     - dumpsys_absent:   run `dumpsys opencyvis` and verify output does NOT contain this string
+#
+# Step DSL (pre_steps / post_steps):
+#     tap_ui:<resource_id>     — find element by resource-id, tap center
+#     tap_text:<text>          — find element by text content, tap center
+#     sleep:<seconds>          — wait N seconds
+#     adb shell <command>      — run raw ADB shell command
 
 # ── Basic scenarios ──────────────────────────────────────────────────────────
 
@@ -836,3 +842,250 @@
   verify:
     - logcat: "Task completed"
     - logcat: "Supplement"
+
+# ── IM remote control scenarios ────────────────────────────────────────────────
+
+- name: remote_im_inbound
+  category: smoke
+  instruction: "直接用 finish 动作完成"
+  timeout: 30
+  mock_responses:
+    - tool_call:
+        thought: "完成"
+        action_type: "finish"
+        summary: "已完成"
+    - tool_call:
+        thought: "打开设置"
+        action_type: open_app
+        app_name: "设置"
+    - tool_call:
+        thought: "完成"
+        action_type: "finish"
+        summary: "已打开设置"
+  extra_deeplink_params:
+    im_remote_enabled: "true"
+  pre_steps:
+    - "adb shell setenforce 0"
+  post_steps:
+    - "adb shell dumpsys opencyvis im fake on"
+    - "sleep:1"
+    - "adb shell dumpsys opencyvis im set-pairing-code telegram 847293"
+    - "sleep:1"
+    - "adb shell dumpsys opencyvis im inbound telegram owner1 owner1 /pair 847293"
+    - "sleep:2"
+    - "adb shell dumpsys opencyvis im inbound telegram owner1 owner1 打开设置"
+    - "sleep:10"
+  verify:
+    - logcat: "Task completed"
+    - im_outbound_contains: "Paired successfully"
+    - im_outbound_contains: "\"kind\":\"TEXT\""
+
+- name: remote_im_pairing_wrong_code
+  category: smoke
+  instruction: "直接用 finish 动作完成"
+  timeout: 20
+  mock_responses:
+    - tool_call:
+        thought: "完成"
+        action_type: "finish"
+        summary: "已完成"
+  extra_deeplink_params:
+    im_remote_enabled: "true"
+  pre_steps:
+    - "adb shell setenforce 0"
+  post_steps:
+    - "adb shell dumpsys opencyvis im fake on"
+    - "sleep:1"
+    - "adb shell dumpsys opencyvis im set-pairing-code telegram 847293"
+    - "sleep:1"
+    - "adb shell dumpsys opencyvis im inbound telegram owner1 owner1 /pair 000000"
+    - "sleep:2"
+  verify:
+    - logcat: "Task completed"
+    - im_outbound_contains: "Wrong pairing code"
+
+- name: remote_im_unpaired_hint
+  category: smoke
+  instruction: "直接用 finish 动作完成"
+  timeout: 20
+  mock_responses:
+    - tool_call:
+        thought: "完成"
+        action_type: "finish"
+        summary: "已完成"
+  extra_deeplink_params:
+    im_remote_enabled: "true"
+  pre_steps:
+    - "adb shell setenforce 0"
+  post_steps:
+    - "adb shell dumpsys opencyvis im fake on"
+    - "sleep:1"
+    - "adb shell dumpsys opencyvis im inbound telegram sender1 chat1 hello"
+    - "sleep:2"
+  verify:
+    - logcat: "Task completed"
+    - im_outbound_contains: "/pair"
+
+- name: remote_im_cold_start
+  category: smoke
+  instruction: ""
+  skip_start_agent: true
+  timeout: 45
+  mock_responses:
+    - tool_call:
+        thought: "打开设置"
+        action_type: open_app
+        app_name: "设置"
+    - tool_call:
+        thought: "完成"
+        action_type: "finish"
+        summary: "已打开设置"
+  extra_deeplink_params:
+    im_remote_enabled: "true"
+  pre_steps:
+    - "adb shell setenforce 0"
+    - "adb shell am force-stop ai.opencyvis"
+    - "adb shell 'sed -i \"/telegram_allowed_chat_id/d\" /data/data/ai.opencyvis/shared_prefs/opencyvis_config.xml'"
+  post_steps:
+    - "adb shell dumpsys opencyvis im fake on"
+    - "sleep:1"
+    - "adb shell dumpsys opencyvis im set-pairing-code telegram 847293"
+    - "sleep:1"
+    - "adb shell dumpsys opencyvis im inbound telegram owner1 owner1 /pair 847293"
+    - "sleep:2"
+    - "adb shell dumpsys opencyvis im inbound telegram owner1 owner1 打开设置"
+    - "sleep:15"
+  verify:
+    - logcat: "Task completed"
+    - im_outbound_contains: "Paired successfully"
+    - im_outbound_contains: "Task complete"
+
+# ── Routine feature scenarios ─────────────────────────────────────────────────
+
+- name: routine_homepage_display
+  category: smoke
+  # Verify routines are shown on homepage after fresh start.
+  # Uses mock to finish immediately, then restarts app to show idle routines screen.
+  instruction: "直接用 finish 动作完成"
+  timeout: 15
+  mock_responses:
+    - tool_call:
+        thought: "直接完成"
+        action_type: "finish"
+        summary: "已完成"
+  pre_steps:
+    - "adb shell setenforce 0"
+  post_steps:
+    # Force-stop to get clean idle state, then relaunch
+    - "adb shell am force-stop ai.opencyvis"
+    - "sleep:1"
+    - "adb shell am start -n ai.opencyvis/.ui.ControlPanelActivity"
+    - "sleep:3"
+  verify:
+    - logcat: "Task completed"
+    - ui_element: "routines_container"
+    - ui_text: "What would you like to do?"
+    - ui_element: "card_recommended"
+    - ui_element: "recycler_routine_chips"
+
+- name: routine_execute_chip
+  category: smoke
+  # Tap a routine chip and verify agent starts with correct instruction.
+  # Uses skip_start_agent so the chip tap (not dumpsys) triggers the agent.
+  # Uses chip_text resource-id to tap the first visible chip (locale-independent).
+  instruction: ""
+  skip_start_agent: true
+  timeout: 30
+  mock_responses:
+    - tool_call:
+        thought: "User wants to check emails"
+        action_type: finish
+        summary: "You have 3 unread emails"
+  pre_steps:
+    - "adb shell setenforce 0"
+  post_steps:
+    - "sleep:5"
+    - "tap_ui:chip_text"
+  verify:
+    - logcat: "Task completed"
+    - logcat: "action_type=finish"
+
+- name: routine_execute_recommended
+  category: smoke
+  # Tap the recommended routine card and verify execution.
+  # On fresh install, recommended shows the most-used routine (first builtin by sort order).
+  # Uses skip_start_agent so the card tap (not dumpsys) triggers the agent.
+  instruction: ""
+  skip_start_agent: true
+  timeout: 30
+  mock_responses:
+    - tool_call:
+        thought: "User wants to order coffee"
+        action_type: finish
+        summary: "Opened coffee app"
+  pre_steps:
+    - "adb shell setenforce 0"
+  post_steps:
+    - "sleep:3"
+    - "tap_ui:card_recommended"
+  verify:
+    - logcat: "Task completed"
+    - logcat: "action_type=finish"
+
+- name: routine_recent_after_execute
+  category: smoke
+  # Execute a routine, restart app, verify it appears in the recent section.
+  instruction: ""
+  skip_start_agent: true
+  timeout: 30
+  mock_responses:
+    - tool_call:
+        thought: "Check emails"
+        action_type: finish
+        summary: "You have 3 unread emails"
+  pre_steps:
+    - "adb shell setenforce 0"
+  post_steps:
+    - "sleep:3"
+    - "tap_text:Check emails"
+    - "sleep:8"
+    - "adb shell am force-stop ai.opencyvis"
+    - "sleep:1"
+    - "adb shell am start -n ai.opencyvis/.ui.ControlPanelActivity"
+    - "sleep:3"
+  verify:
+    - logcat: "Task completed"
+    - ui_element: "container_recent_routines"
+    - ui_element: "label_recent"
+
+# ── VD Launcher Focus Guard ──────────────────────────────────────────────────
+
+- name: launcher_tap_blocked
+  category: smoke
+  instruction: "查询天气"
+  timeout: 20
+  mock_responses:
+    - tool_call:
+        thought: "尝试点击应用列表打开天气应用"
+        action_type: tap
+        x: 500
+        y: 955
+    - tool_call:
+        thought: "tap被阻止了，用list_apps搜索"
+        action_type: list_apps
+        keyword: "browser"
+    - tool_call:
+        thought: "找到浏览器，打开它"
+        action_type: open_app
+        app_name: "browser"
+    - tool_call:
+        thought: "完成"
+        action_type: finish
+        summary: "已打开浏览器查询天气"
+  pre_steps:
+    - "adb shell setenforce 0"
+    - "adb shell am force-stop ai.opencyvis"
+  verify:
+    - logcat: "Action blocked: launcher is the foreground app"
+    - logcat: "list_apps result"
+    - logcat: "Task completed"

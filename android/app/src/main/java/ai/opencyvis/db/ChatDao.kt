@@ -50,4 +50,7 @@ interface ChatDao {
         )
     """)
     fun updateLastMessageType(convId: Long, oldType: String, newType: String, updatedAt: Long)
+
+    @Query("UPDATE conversations SET status = 'stopped', updatedAt = :updatedAt WHERE status = 'running'")
+    fun markStaleRunningAsStopped(updatedAt: Long)
 }

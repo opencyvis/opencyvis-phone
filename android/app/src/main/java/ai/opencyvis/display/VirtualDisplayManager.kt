@@ -1,7 +1,9 @@
 package ai.opencyvis.display
 
+import ai.opencyvis.backend.DisplayOps
+import ai.opencyvis.backend.PrivilegeBackend
+import ai.opencyvis.backend.SystemBackend
 import android.content.Context
-import android.content.ComponentName
 import android.graphics.Bitmap
 import android.graphics.ColorSpace
 import android.graphics.PixelFormat
@@ -12,9 +14,7 @@ import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
-import android.view.Display
 import android.view.Surface
-import java.lang.reflect.Method
 import java.nio.ByteBuffer
 
 data class TaskSnapshot(
@@ -36,7 +36,10 @@ data class TaskSnapshot(
  * Supports task reparenting: moving Activity tasks between the VD and physical display
  * via moveTaskToDisplay() for view/takeover mode.
  */
-class VirtualDisplayManager(private val context: Context) {
+class VirtualDisplayManager(
+    private val context: Context,
+    private val backend: PrivilegeBackend = SystemBackend()
+) {
 
     companion object {
         private const val TAG = "VirtualDisplayManager"
@@ -54,13 +57,16 @@ class VirtualDisplayManager(private val context: Context) {
         private const val VIRTUAL_DISPLAY_FLAG_ROTATES_WITH_CONTENT = 1 shl 7   // 128
         private const val VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS = 1 shl 9  // 512
         private const val VIRTUAL_DISPLAY_FLAG_TRUSTED = 1 shl 10              // 1024
+        private const val VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP = 1 shl 11   // 2048
         private const val VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED = 1 shl 12      // 4096
+        private const val VIRTUAL_DISPLAY_FLAG_TOUCH_FEEDBACK_DISABLED = 1 shl 13 // 8192
         private const val VIRTUAL_DISPLAY_FLAG_OWN_FOCUS = 1 shl 14            // 16384
-        private const val VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED = 1 shl 15 // 32768
-        private const val VIRTUAL_DISPLAY_FLAG_TOUCH_FEEDBACK_DISABLED = 1 shl 16 // 65536
+        private const val VIRTUAL_DISPLAY_FLAG_DEVICE_DISPLAY_GROUP = 1 shl 15 // 32768
+        private const val VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED = 1 shl 16 // 65536
     }
 
     private var virtualDisplay: VirtualDisplay? = null
+    private var remoteVdDisplayId: Int = -1
     private var imageReader: ImageReader? = null
     private var readerHandlerThread: HandlerThread? = null
     private var readerHandler: Handler? = null
@@ -72,9 +78,12 @@ class VirtualDisplayManager(private val context: Context) {
      * The display ID of the virtual display, or -1 if not created.
      */
     val displayId: Int
-        get() = virtualDisplay?.display?.displayId ?: -1
+        get() = if (remoteVdDisplayId > 0) remoteVdDisplayId else virtualDisplay?.display?.displayId ?: -1
 
     val isCreated: Boolean
+        get() = virtualDisplay != null || remoteVdDisplayId > 0
+
+    val hasLocalDisplay: Boolean
         get() = virtualDisplay != null
 
     val width: Int
@@ -83,44 +92,15 @@ class VirtualDisplayManager(private val context: Context) {
     val height: Int
         get() = imageReader?.height ?: DEFAULT_HEIGHT
 
-    // ── Task reparenting API (hidden Android APIs via reflection) ────────
-
-    private val activityTaskManager: Any? by lazy {
-        try {
-            Class.forName("android.app.ActivityTaskManager")
-                .getMethod("getService").invoke(null)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get ActivityTaskManager service", e)
-            null
-        }
-    }
-
-    private val moveTaskMethod: Method? by lazy {
-        val atm = activityTaskManager ?: return@lazy null
-        // Try method names in order of preference (varies by Android version)
-        val methodNames = listOf("moveRootTaskToDisplay", "moveTaskToDisplay")
-        for (name in methodNames) {
-            try {
-                return@lazy atm.javaClass.getMethod(
-                    name,
-                    Int::class.javaPrimitiveType,
-                    Int::class.javaPrimitiveType
-                )
-            } catch (_: NoSuchMethodException) {
-                continue
-            }
-        }
-        Log.e(TAG, "No moveTaskToDisplay method found on ${atm.javaClass.name}")
-        null
-    }
+    // ── Task reparenting API (delegates to PrivilegeBackend) ──────────
 
     /**
      * Get the top non-OpenCyvis task ID running on the specified display.
-     * Uses ActivityTaskManager.getTasks() via reflection.
      * Returns null if no suitable task is found.
      */
     fun getTopTaskIdOnDisplay(targetDisplayId: Int): Int? {
-        return getTopTaskOnDisplay(targetDisplayId)?.taskId
+        val id = backend.getTopTaskIdOnDisplay(targetDisplayId, context.packageName)
+        return if (id > 0) id else null
     }
 
     fun getTopTaskOnDisplay(targetDisplayId: Int): TaskSnapshot? {
@@ -138,45 +118,9 @@ class VirtualDisplayManager(private val context: Context) {
     }
 
     fun getRunningTasks(limit: Int = 50): List<TaskSnapshot> {
-        val atm = activityTaskManager ?: return emptyList()
         return try {
-            val tasks = try {
-                val method = atm.javaClass.getMethod(
-                    "getTasks",
-                    Int::class.javaPrimitiveType,
-                    Boolean::class.javaPrimitiveType,
-                    Boolean::class.javaPrimitiveType,
-                    Int::class.javaPrimitiveType
-                )
-                val result = mutableListOf<Any?>()
-                val defaultTasks = method.invoke(
-                    atm, limit, false, false, Display.DEFAULT_DISPLAY
-                ) as? List<*>
-                result.addAll(defaultTasks.orEmpty())
-                val vdDisplayId = displayId
-                if (vdDisplayId != -1 && vdDisplayId != Display.DEFAULT_DISPLAY) {
-                    val vdTasks = method.invoke(atm, limit, false, false, vdDisplayId) as? List<*>
-                    result.addAll(vdTasks.orEmpty())
-                }
-                result
-            } catch (e: NoSuchMethodException) {
-                try {
-                    atm.javaClass.getMethod(
-                        "getTasks",
-                        Int::class.javaPrimitiveType,
-                        Boolean::class.javaPrimitiveType,
-                        Boolean::class.javaPrimitiveType
-                    ).invoke(atm, limit, false, false) as? List<*>
-                } catch (e2: NoSuchMethodException) {
-                    // Fallback: getTasks without visibility flags.
-                    Log.w(TAG, "getTasks extended forms not found, falling back to getTasks(int)")
-                    atm.javaClass.getMethod(
-                        "getTasks", Int::class.javaPrimitiveType
-                    ).invoke(atm, limit) as? List<*>
-                }
-            }
-
-            tasks.orEmpty().mapNotNull { taskInfoToSnapshot(it) }
+            DisplayOps.getRunningTaskInfos(limit, displayId)
+                .mapNotNull { taskInfoToSnapshot(it) }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get running tasks", e)
             emptyList()
@@ -187,16 +131,22 @@ class VirtualDisplayManager(private val context: Context) {
         return task.containsPackage(context.packageName)
     }
 
+    fun isOwnPackage(task: TaskSnapshot): Boolean {
+        val pkg = context.packageName
+        return task.topPackage == pkg || task.basePackage == pkg
+                || task.topPackage == "ai.opencyvis" || task.basePackage == "ai.opencyvis"
+    }
+
     private fun taskInfoToSnapshot(taskInfo: Any?): TaskSnapshot? {
         if (taskInfo == null) return null
         return try {
-            val taskId = readIntField(taskInfo, "taskId") ?: return null
-            val displayId = readIntField(taskInfo, "displayId") ?: -1
-            val baseActivity = readComponent(taskInfo, "baseActivity")
-                ?: readComponentFromGetter(taskInfo, "getBaseActivity")
-            val topActivity = readComponent(taskInfo, "topActivity")
-                ?: readComponentFromGetter(taskInfo, "getTopActivity")
-            val lastActiveTime = readLongField(taskInfo, "lastActiveTime") ?: 0L
+            val taskId = DisplayOps.readIntField(taskInfo, "taskId") ?: return null
+            val displayId = DisplayOps.readIntField(taskInfo, "displayId") ?: -1
+            val baseActivity = DisplayOps.readComponent(taskInfo, "baseActivity")
+                ?: DisplayOps.readComponentFromGetter(taskInfo, "getBaseActivity")
+            val topActivity = DisplayOps.readComponent(taskInfo, "topActivity")
+                ?: DisplayOps.readComponentFromGetter(taskInfo, "getTopActivity")
+            val lastActiveTime = DisplayOps.readLongField(taskInfo, "lastActiveTime") ?: 0L
             TaskSnapshot(
                 taskId = taskId,
                 displayId = displayId,
@@ -210,105 +160,12 @@ class VirtualDisplayManager(private val context: Context) {
         }
     }
 
-    private fun readComponent(taskInfo: Any, fieldName: String): ComponentName? {
-        return try {
-            readField(taskInfo, fieldName) as? ComponentName
-        } catch (_: Exception) { null }
-    }
-
-    private fun readComponentFromGetter(taskInfo: Any, methodName: String): ComponentName? {
-        return try {
-            taskInfo.javaClass.getMethod(methodName).invoke(taskInfo) as? ComponentName
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun readIntField(target: Any, fieldName: String): Int? {
-        return try {
-            readField(target, fieldName) as? Int
-        } catch (_: Exception) { null }
-    }
-
-    private fun readLongField(target: Any, fieldName: String): Long? {
-        return try {
-            readField(target, fieldName) as? Long
-        } catch (_: Exception) { null }
-    }
-
-    private fun readField(target: Any, fieldName: String): Any? {
-        val cls = target.javaClass
-        return try {
-            cls.getField(fieldName).get(target)
-        } catch (_: NoSuchFieldException) {
-            val field = cls.getDeclaredField(fieldName)
-            field.isAccessible = true
-            field.get(target)
-        }
-    }
-
     /**
-     * Move a task to a different display using ActivityTaskManager.moveTaskToDisplay().
+     * Move a task to a different display.
      * Returns true on success.
      */
     fun moveTaskToDisplay(taskId: Int, targetDisplayId: Int): Boolean {
-        return try {
-            moveTaskMethod?.invoke(activityTaskManager, taskId, targetDisplayId)
-            Log.i(TAG, "Moved task $taskId to display $targetDisplayId")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "moveTaskToDisplay($taskId, $targetDisplayId) failed", e)
-            false
-        }
-    }
-
-    // ── IME policy ────────────────────────────────────────────────────
-
-    /**
-     * Set the display's IME policy to LOCAL so the soft keyboard renders
-     * on the VD itself (visible through SurfaceView) rather than falling
-     * back to Display 0.
-     *
-     * Bind IME directly to VD display.
-     * DISPLAY_IME_POLICY_LOCAL = 0 (Android 13+)
-     */
-    private fun setDisplayImePolicy(dm: DisplayManager, displayId: Int) {
-        // DISPLAY_IME_POLICY_LOCAL = 0: keyboard renders on this display
-        val DISPLAY_IME_POLICY_LOCAL = 0
-
-        // Try IWindowManager.setDisplayImePolicy() (Android 12+)
-        try {
-            val binder = Class.forName("android.os.ServiceManager")
-                .getMethod("getService", String::class.java)
-                .invoke(null, "window") as? android.os.IBinder ?: throw Exception("No window service")
-
-            val stub = Class.forName("android.view.IWindowManager\$Stub")
-            val wm = stub.getMethod("asInterface", android.os.IBinder::class.java)
-                .invoke(null, binder)
-
-            wm!!.javaClass.getMethod(
-                "setDisplayImePolicy",
-                Int::class.javaPrimitiveType,
-                Int::class.javaPrimitiveType
-            ).invoke(wm, displayId, DISPLAY_IME_POLICY_LOCAL)
-
-            Log.i(TAG, "Set DISPLAY_IME_POLICY_LOCAL on display $displayId via IWindowManager")
-            return
-        } catch (e: Exception) {
-            Log.w(TAG, "IWindowManager.setDisplayImePolicy failed: ${e.message}")
-        }
-
-        // Fallback: try DisplayManager.setDisplayImePolicy() (Android 14+)
-        try {
-            dm.javaClass.getMethod(
-                "setDisplayImePolicy",
-                Int::class.javaPrimitiveType,
-                Int::class.javaPrimitiveType
-            ).invoke(dm, displayId, DISPLAY_IME_POLICY_LOCAL)
-            Log.i(TAG, "Set DISPLAY_IME_POLICY_LOCAL on display $displayId via DisplayManager")
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to set display IME policy: ${e.message}")
-        }
+        return backend.moveTaskToDisplay(taskId, targetDisplayId)
     }
 
     // ── Surface switching ──────────────────────────────────────────────
@@ -329,17 +186,33 @@ class VirtualDisplayManager(private val context: Context) {
      * from the compositor regardless of which surface the VD renders to.
      */
     fun setSurface(surface: Surface?) {
-        val vd = virtualDisplay ?: return
-        if (surface != null) {
-            externalSurface = surface
-            isUsingExternalSurface = true
-            vd.surface = surface
-            Log.i(TAG, "VD surface switched to SurfaceView")
-        } else {
-            externalSurface = null
-            isUsingExternalSurface = false
-            vd.surface = imageReader?.surface
-            Log.i(TAG, "VD surface switched back to ImageReader")
+        val vd = virtualDisplay
+        if (vd != null) {
+            // Local VD — switch surface directly
+            if (surface != null) {
+                externalSurface = surface
+                isUsingExternalSurface = true
+                vd.surface = surface
+                Log.i(TAG, "VD surface switched to SurfaceView (local)")
+            } else {
+                externalSurface = null
+                isUsingExternalSurface = false
+                vd.surface = imageReader?.surface
+                Log.i(TAG, "VD surface switched back to ImageReader (local)")
+            }
+        } else if (remoteVdDisplayId > 0) {
+            // Remote VD — pass Surface cross-process to PrivilegedService
+            if (surface != null) {
+                externalSurface = surface
+                isUsingExternalSurface = true
+                backend.setVirtualDisplaySurface(surface)
+                Log.i(TAG, "VD surface switched to SurfaceView (remote)")
+            } else {
+                externalSurface = null
+                isUsingExternalSurface = false
+                backend.setVirtualDisplaySurface(null)
+                Log.i(TAG, "VD surface switched back to ImageReader (remote)")
+            }
         }
     }
 
@@ -437,18 +310,82 @@ class VirtualDisplayManager(private val context: Context) {
                 }
             }, readerHandler)
 
-            // VD config flags (mFlags=120533)
-            val flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC or
-                    DisplayManager.VIRTUAL_DISPLAY_FLAG_SECURE or
-                    VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR or
+            // VD config flags — adapt based on backend capabilities
+            var flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC or
                     VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH or
-                    VIRTUAL_DISPLAY_FLAG_ROTATES_WITH_CONTENT or
+                    VIRTUAL_DISPLAY_FLAG_ROTATES_WITH_CONTENT
+
+            if (backend is ai.opencyvis.backend.SystemBackend) {
+                flags = flags or DisplayManager.VIRTUAL_DISPLAY_FLAG_SECURE or
+                    VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR or
                     VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS or
                     VIRTUAL_DISPLAY_FLAG_TRUSTED or
                     VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED or
+                    VIRTUAL_DISPLAY_FLAG_TOUCH_FEEDBACK_DISABLED or
                     VIRTUAL_DISPLAY_FLAG_OWN_FOCUS or
-                    VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED or
-                    VIRTUAL_DISPLAY_FLAG_TOUCH_FEEDBACK_DISABLED
+                    VIRTUAL_DISPLAY_FLAG_DEVICE_DISPLAY_GROUP or
+                    VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED
+            } else {
+                // For RemoteBackend (shell uid), DO NOT use AUTO_MIRROR.
+                // Without TRUSTED permission, AUTO_MIRROR causes the VD to permanently
+                // mirror display 0 instead of showing independently launched activities.
+                flags = flags or
+                    VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS or
+                    VIRTUAL_DISPLAY_FLAG_TRUSTED or
+                    VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP or
+                    VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED or
+                    VIRTUAL_DISPLAY_FLAG_TOUCH_FEEDBACK_DISABLED or
+                    VIRTUAL_DISPLAY_FLAG_OWN_FOCUS or
+                    VIRTUAL_DISPLAY_FLAG_DEVICE_DISPLAY_GROUP or
+                    VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED
+            }
+
+            // For RemoteBackend, create VD via the privileged service (shell uid has permissions).
+            // For SystemBackend, create locally (same process has permissions).
+            if (backend is ai.opencyvis.backend.RemoteBackend) {
+                // Try progressively reduced flag sets until VD creation succeeds
+                val flagSetsToTry = listOf(
+                    flags,
+                    // Without ALWAYS_UNLOCKED but keep TRUSTED
+                    flags and VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED.inv(),
+                    // Without TRUSTED but keep ALWAYS_UNLOCKED
+                    flags and VIRTUAL_DISPLAY_FLAG_TRUSTED.inv(),
+                    // Without both TRUSTED + ALWAYS_UNLOCKED
+                    flags and (VIRTUAL_DISPLAY_FLAG_TRUSTED or VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED).inv(),
+                    // Minimal: PUBLIC + SUPPORTS_TOUCH + ROTATES_WITH_CONTENT + SYSTEM_DECORATIONS
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC or
+                        VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH or
+                        VIRTUAL_DISPLAY_FLAG_ROTATES_WITH_CONTENT or
+                        VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS
+                )
+                var remoteDisplayId = -1
+                for ((idx, flagSet) in flagSetsToTry.withIndex()) {
+                    remoteDisplayId = backend.createVirtualDisplay(DISPLAY_NAME, width, height, dpi, flagSet)
+                    if (remoteDisplayId > 0) {
+                        Log.i(TAG, "VD created with flag set $idx (flags=0x${Integer.toHexString(flagSet)})")
+                        break
+                    }
+                    Log.w(TAG, "VD creation failed with flag set $idx (flags=0x${Integer.toHexString(flagSet)})")
+                }
+                if (remoteDisplayId <= 0) {
+                    Log.e(TAG, "Remote createVirtualDisplay failed (id=$remoteDisplayId)")
+                    destroy()
+                    return -1
+                }
+                remoteVdDisplayId = remoteDisplayId
+
+                // For RemoteBackend, the PrivilegedService keeps its own ImageReader
+                // and captures frames locally in the shell process. We retrieve screenshots
+                // via the Binder captureScreen() call. Cross-process Surface passing
+                // is unreliable on non-TRUSTED displays.
+                Log.i(TAG, "Remote VD created: displayId=$remoteDisplayId (capture via remote service)")
+
+                backend.setDisplayImePolicy(remoteDisplayId, 0)
+                // Note: keyguard dismissal is handled by the PrivilegedService (shell uid)
+                // immediately after VD creation via `wm dismiss-keyguard`.
+
+                return remoteDisplayId
+            }
 
             virtualDisplay = dm.createVirtualDisplay(
                 DISPLAY_NAME, width, height, dpi,
@@ -467,7 +404,8 @@ class VirtualDisplayManager(private val context: Context) {
             // Set IME policy to LOCAL so the keyboard renders inside the VD
             // (visible through SurfaceView in VIEW/TAKEOVER mode).
             // Without this, keyboard appears on Display 0 and input doesn't reach the VD.
-            setDisplayImePolicy(dm, id)
+            // DISPLAY_IME_POLICY_LOCAL = 0
+            backend.setDisplayImePolicy(id, 0)
 
             return id
         } catch (e: Exception) {
@@ -569,6 +507,10 @@ class VirtualDisplayManager(private val context: Context) {
      * Destroy the virtual display and release resources.
      */
     fun destroy() {
+        if (remoteVdDisplayId > 0) {
+            backend.releaseVirtualDisplay()
+            remoteVdDisplayId = -1
+        }
         virtualDisplay?.release()
         virtualDisplay = null
         imageReader?.setOnImageAvailableListener(null, null)

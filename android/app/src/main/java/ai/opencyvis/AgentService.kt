@@ -17,7 +17,16 @@ import android.os.Looper
 import android.widget.Toast
 import ai.opencyvis.action.ActionExecutor
 import ai.opencyvis.accessibility.VdAccessibilityService
+import ai.opencyvis.backend.BackendDetector
+import ai.opencyvis.backend.ConnectionState
+import ai.opencyvis.backend.DetectionResult
+import ai.opencyvis.backend.PrivilegeBackend
+import ai.opencyvis.backend.RemoteBackend
+import ai.opencyvis.backend.SetupStateDetector
+import ai.opencyvis.backend.SystemBackend
+import ai.opencyvis.capture.ScreenCapture
 import ai.opencyvis.config.ConfigRepository
+import ai.opencyvis.db.AppDatabase
 import ai.opencyvis.db.ChatHistoryRepository
 import ai.opencyvis.db.GlobalMemoryRepository
 import ai.opencyvis.display.TaskDisplayGuard
@@ -35,7 +44,9 @@ import ai.opencyvis.llm.LLMClient
 import ai.opencyvis.llm.LLMClientInterface
 import ai.opencyvis.llm.OllamaClient
 import ai.opencyvis.overlay.OverlayStatePolicy
+import ai.opencyvis.schedule.ScheduleManager
 import ai.opencyvis.ui.MessageType
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -100,7 +111,28 @@ class AgentService : Service() {
         private set
     var currentInstruction: String = ""
         private set
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val backendDeferred = CompletableDeferred<PrivilegeBackend>()
+    private var backend: PrivilegeBackend? = null
+
+    /** The name of the currently active backend (e.g. "system", "shizuku", "adb-direct"), or null. */
+    val activeBackendName: String?
+        get() = backend?.capabilities?.name
+
+    /** Disconnect the privilege backend. The user can reconnect later from the setup flow. */
+    fun revokeBackend() {
+        backend?.destroy()
+        backend = null
+        Log.i(TAG, "Backend revoked by user")
+    }
+
+    /** Update the backend after pairing/reconnection (called by AdbPairingService). */
+    fun updateBackend(newBackend: PrivilegeBackend) {
+        backend = newBackend
+        ScreenCapture.backend = newBackend
+        observeConnectorState(newBackend)
+        Log.i(TAG, "Backend updated: ${newBackend.capabilities.name}")
+    }
     private var stateObserverJob: Job? = null
     private var historyObserverJob: Job? = null
     private var lastHistoryStatus: String? = null
@@ -108,6 +140,8 @@ class AgentService : Service() {
     private var handoffMonitorJob: Job? = null
     private var activeHandoffStep: Int? = null
     private var activeHandoffReason: String = ""
+    private var disconnectTimestamp: Long? = null
+    private var disconnectObserverJob: Job? = null
 
     inner class AgentBinder : Binder() {
         fun getService(): AgentService = this@AgentService
@@ -121,15 +155,53 @@ class AgentService : Service() {
         super.onCreate()
         App.agentService = this
         config = ConfigRepository(this)
+        // Auto-apply active profile to ensure config values match saved profile
+        val activeProfile = config.activeProfileName
+        if (activeProfile.isNotEmpty()) {
+            val profileRepo = ai.opencyvis.config.ProfileRepository(config, this)
+            profileRepo.switchTo(activeProfile)
+        }
         historyRepo = ChatHistoryRepository(this)
         memoryRepo = GlobalMemoryRepository(this)
         createNotificationChannel()
         ensureAccessibilityServiceEnabled()
+        // Mark stale "running" conversations as stopped — agent can't survive process restart
+        scope.launch {
+            historyRepo.markStaleRunningAsStopped()
+        }
+        // Detect privilege backend (async for Shizuku, instant for system app)
+        scope.launch {
+            when (val result = BackendDetector.detect(this@AgentService)) {
+                is DetectionResult.Ready -> {
+                    backend = result.backend
+                    ScreenCapture.backend = result.backend
+                    backendDeferred.complete(result.backend)
+                    observeConnectorState(result.backend)
+                    Log.i(TAG, "Backend ready: ${result.backend.capabilities.name}")
+                }
+                is DetectionResult.SetupRequired -> {
+                    // Don't fall back to SystemBackend on standard flavor — it won't work
+                    backendDeferred.complete(SystemBackend()) // unblock startAgent (will fail gracefully)
+                    Log.w(TAG, "Backend setup required — user needs to complete setup wizard")
+                }
+                is DetectionResult.NoneAvailable -> {
+                    backendDeferred.complete(SystemBackend()) // unblock startAgent
+                    Log.w(TAG, "No backend available — wireless debugging not enabled?")
+                }
+            }
+        }
         Log.i(TAG, "AgentService created")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, buildNotification("OpenCyvis agent ready"))
+
+        if (intent?.action == "ai.opencyvis.START_SCHEDULED") {
+            val instruction = intent.getStringExtra("instruction") ?: return START_STICKY
+            Log.i(TAG, "Scheduled task triggered: $instruction")
+            startAgent(instruction)
+            return START_STICKY
+        }
 
         // Support starting agent via intent extra (e.g. from adb)
         val instruction = intent?.getStringExtra("instruction")
@@ -147,14 +219,80 @@ class AgentService : Service() {
         taskDisplayGuard = null
         handoffObserverJob?.cancel()
         handoffMonitorJob?.cancel()
+        disconnectObserverJob?.cancel()
         releaseAgentWakeLock()
         engine?.destroy()
         engine = null
         _engineFlow.value = null
         virtualDisplayManager?.destroy()
         virtualDisplayManager = null
+        backend?.destroy()
+        backend = null
         Log.i(TAG, "AgentService destroyed")
         super.onDestroy()
+    }
+
+    private fun observeConnectorState(b: PrivilegeBackend) {
+        disconnectObserverJob?.cancel()
+        if (b !is RemoteBackend) return
+
+        disconnectObserverJob = scope.launch {
+            b.connector.state.collect { state ->
+                when (state) {
+                    is ConnectionState.Disconnected -> {
+                        val isEngineRunning = engine?.state?.value is AgentState.Running
+                        if (isEngineRunning) {
+                            Log.w(TAG, "Backend disconnected during active task, pausing")
+                            engine?.pause()
+                            disconnectTimestamp = System.currentTimeMillis()
+                            updateNotification("⏸ Paused — reconnecting...")
+                        } else {
+                            Log.w(TAG, "Backend disconnected while idle")
+                        }
+
+                        // Attempt auto-reconnect
+                        val wirelessOn = SetupStateDetector.isWirelessDebuggingEnabled(this@AgentService)
+                        if (wirelessOn) {
+                            Log.i(TAG, "Wireless debugging still on, attempting auto-reconnect...")
+                            var reconnected = false
+                            for (attempt in 1..5) {
+                                delay(3000L * attempt)
+                                if (retryBackendDetection()) {
+                                    Log.i(TAG, "Auto-reconnect succeeded on attempt $attempt")
+                                    reconnected = true
+                                    break
+                                }
+                            }
+                            if (!reconnected) {
+                                Log.w(TAG, "Auto-reconnect failed after 5 attempts")
+                                backend = null
+                                ScreenCapture.backend = SystemBackend()
+                            }
+                        } else {
+                            Log.i(TAG, "Wireless debugging is off, clearing backend")
+                            backend = null
+                            ScreenCapture.backend = SystemBackend()
+                        }
+                    }
+                    is ConnectionState.Connected -> {
+                        val wasDisconnected = disconnectTimestamp != null
+                        val isEnginePaused = engine?.state?.value is AgentState.Paused
+                        if (wasDisconnected && isEnginePaused) {
+                            val elapsed = System.currentTimeMillis() - disconnectTimestamp!!
+                            disconnectTimestamp = null
+
+                            if (elapsed > 10_000) {
+                                Log.i(TAG, "Long disconnect (${elapsed}ms), resuming with fresh state")
+                            }
+                            engine?.resume()
+                            updateNotification("Running: ${currentInstruction.take(30)}...")
+                            Log.i(TAG, "Backend reconnected after ${elapsed}ms, resumed agent")
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
 
     private fun ensureAccessibilityServiceEnabled() {
@@ -203,6 +341,7 @@ class AgentService : Service() {
         _handoffUiState.value = HandoffUiState.Idle
         releaseAgentWakeLock()
 
+        Log.i(TAG, "startAgent config: provider=${config.apiProvider} model=${config.model} baseUrl=${config.baseUrl} key=${config.apiKey.take(10)}...")
         val llmClient: LLMClientInterface = when (config.apiProvider) {
             ConfigRepository.PROVIDER_ANTHROPIC -> AnthropicClient(
                 apiKey = config.apiKey,
@@ -220,85 +359,126 @@ class AgentService : Service() {
             )
         }
 
-        // Always use VirtualDisplay — reuse existing or create new
-        var vdm = virtualDisplayManager
-        var displayId: Int
-        var displaySize: Point?
-
-        if (vdm != null && vdm.isCreated) {
-            displayId = vdm.displayId
-            displaySize = Point(vdm.width, vdm.height)
-            Log.i(TAG, "Reusing existing virtual display $displayId")
-        } else {
-            vdm?.destroy()
-            vdm = VirtualDisplayManager(this)
-            // Use physical screen resolution so VD matches the real display
-            val dm = resources.displayMetrics
-            val id = vdm.create(width = dm.widthPixels, height = dm.heightPixels, dpi = dm.densityDpi)
-            if (id != -1) {
-                displayId = id
-                displaySize = Point(vdm.width, vdm.height)
-                virtualDisplayManager = vdm
-                Log.i(TAG, "Virtual display created: $id (${vdm.width}x${vdm.height})")
-            } else {
-                Log.e(TAG, "Failed to create virtual display")
-                vdm.destroy()
-                virtualDisplayManager = null
-                updateNotification("Error: failed to create virtual display")
-                return
-            }
-        }
-
-        acquireAgentWakeLock()
-
-        val actionExecutor = ActionExecutor(
-            this,
-            displayId,
-            displaySize,
-            onOpenAppSuccess = { launchedPkg ->
-                taskDisplayGuard?.trackLaunch(launchedPkg)
-                mainHandler.postDelayed({ refreshControlledTasksFromVd("open_app_success") }, 250)
-            }
-        )
-
-        val newEngine = AgentEngine(
-            llmClient,
-            actionExecutor,
-            config.maxSteps,
-            vdm,
-            config.debugMode,
-            memoryRepo,
-            viewTreeProvider = { displayId, w, h ->
-                VdAccessibilityService.captureViewTree(displayId, w, h)
-            }
-        )
-        engine = newEngine
-        currentInstruction = instruction
-        _engineFlow.value = newEngine
-        newEngine.start(instruction)
-
-        updateNotification("Running: ${instruction.take(30)}...")
-        Log.i(TAG, "Agent started with instruction: $instruction")
-
-        // Persist conversation to history DB
+        // Await backend detection, then create VDM + engine in coroutine
         scope.launch {
+            val b = backend ?: backendDeferred.await()
+
+            // Always use VirtualDisplay — reuse existing or create new
+            var vdm = virtualDisplayManager
+            var displayId: Int
+            var displaySize: Point?
+
+            if (vdm != null && vdm.isCreated) {
+                displayId = vdm.displayId
+                displaySize = Point(vdm.width, vdm.height)
+                Log.i(TAG, "Reusing existing virtual display $displayId")
+            } else {
+                vdm?.destroy()
+                vdm = VirtualDisplayManager(this@AgentService, b)
+                // Use physical screen resolution so VD matches the real display
+                val dm = resources.displayMetrics
+                val id = vdm.create(width = dm.widthPixels, height = dm.heightPixels, dpi = dm.densityDpi)
+                if (id != -1) {
+                    displayId = id
+                    displaySize = Point(vdm.width, vdm.height)
+                    virtualDisplayManager = vdm
+                    Log.i(TAG, "Virtual display created: $id (${vdm.width}x${vdm.height})")
+                } else {
+                    Log.e(TAG, "Failed to create virtual display")
+                    vdm.destroy()
+                    virtualDisplayManager = null
+                    updateNotification("Error: failed to create virtual display")
+                    return@launch
+                }
+            }
+
+            acquireAgentWakeLock()
+
+            val actionExecutor = ActionExecutor(
+                this@AgentService,
+                displayId,
+                displaySize,
+                onOpenAppSuccess = { launchedPkg ->
+                    taskDisplayGuard?.trackLaunch(launchedPkg)
+                    mainHandler.postDelayed({ refreshControlledTasksFromVd("open_app_success") }, 250)
+                },
+                backend = b
+            )
+
+            val newEngine = AgentEngine(
+                llmClient,
+                actionExecutor,
+                config.maxSteps,
+                vdm,
+                config.debugMode,
+                memoryRepo,
+                viewTreeProvider = { displayId, w, h ->
+                    VdAccessibilityService.captureViewTree(displayId, w, h)
+                },
+                shouldForwardScreenshot = { config.imSendStepScreenshots },
+                onSaveRoutine = { name, icon, instr, schedType, schedTime, schedRepeat,
+                                  schedInterval, schedLocation, schedOnEnter ->
+                    scope.launch(Dispatchers.IO) {
+                        val dao = AppDatabase.getInstance(this@AgentService).routineDao()
+                        val routine = ai.opencyvis.db.RoutineEntity(
+                            name = name,
+                            icon = icon,
+                            instruction = instr,
+                            description = null,
+                            category = "custom",
+                            isPinned = false,
+                            useCount = 0,
+                            lastUsedAt = null,
+                            createdAt = System.currentTimeMillis(),
+                            sortOrder = 100,
+                            scheduleEnabled = schedType != null,
+                            triggerType = schedType,
+                            scheduleHour = schedTime?.split(":")?.getOrNull(0)?.toIntOrNull(),
+                            scheduleMinute = schedTime?.split(":")?.getOrNull(1)?.toIntOrNull(),
+                            scheduleRepeatDays = when (schedRepeat) {
+                                "daily", null -> null
+                                "weekdays" -> "1,2,3,4,5"
+                                else -> schedRepeat
+                            },
+                            intervalMinutes = schedInterval,
+                            geoLocationName = schedLocation,
+                            geoTriggerOnEnter = schedOnEnter
+                        )
+                        val id = dao.insertRoutine(routine).toInt()
+                        if (schedType != null) {
+                            ScheduleManager.register(this@AgentService, routine.copy(id = id))
+                        }
+                        Log.i(TAG, "Saved routine '$name' (id=$id, schedule=$schedType)")
+                    }
+                }
+            )
+            engine = newEngine
+            currentInstruction = instruction
+            _engineFlow.value = newEngine
+            observeConnectorState(b)
+            newEngine.start(instruction)
+
+            updateNotification("Running: ${instruction.take(30)}...")
+            Log.i(TAG, "Agent started with instruction: $instruction")
+
+            // Persist conversation to history DB
             val convId = historyRepo.startConversation(instruction)
             currentConversationId = convId
             historyRepo.addMessage(convId, MessageType.USER_INPUT, instruction)
+
+            observeHistoryWrites()
+            observeStateForVdLifecycle()
+            observeAskUserNotifications()
+            observeHandoffRequests()
+            startTaskDisplayGuard(vdm)
         }
-        observeHistoryWrites()
-        observeStateForVdLifecycle()
-        observeAskUserNotifications()
-        observeHandoffRequests()
-        startTaskDisplayGuard(vdm)
     }
 
     private class DebugLLMClient : LLMClientInterface {
         override suspend fun chatWithTools(messages: List<Map<String, Any>>): Map<String, Any?> =
             mapOf(
-                "type" to "wait",
+                "action_type" to "wait",
                 "thought" to "debug wait",
-                "completed" to false,
             )
 
         override fun shutdown() {}
@@ -317,10 +497,11 @@ class AgentService : Service() {
         handoffMonitorJob?.cancel()
         releaseAgentWakeLock()
 
+        val b = backend ?: SystemBackend()
         var vdm = virtualDisplayManager
         if (vdm == null || !vdm.isCreated) {
             vdm?.destroy()
-            vdm = VirtualDisplayManager(this)
+            vdm = VirtualDisplayManager(this, b)
             val dm = resources.displayMetrics
             val displayId = vdm.create(
                 width = dm.widthPixels,
@@ -346,7 +527,8 @@ class AgentService : Service() {
                 onOpenAppSuccess = { launchedPkg ->
                     taskDisplayGuard?.trackLaunch(launchedPkg)
                     mainHandler.postDelayed({ refreshControlledTasksFromVd("debug_open_app_success") }, 250)
-                }
+                },
+                backend = b
             ),
             config.maxSteps,
             vdm,
@@ -744,6 +926,22 @@ class AgentService : Service() {
         updateNotification("Agent running")
     }
 
+    suspend fun retryBackendDetection(): Boolean {
+        val result = BackendDetector.detect(this@AgentService)
+        if (result is DetectionResult.Ready) {
+            backend = result.backend
+            ScreenCapture.backend = result.backend
+            observeConnectorState(result.backend)
+            // New PrivilegedService won't have the old VD's ImageReader — destroy stale VDM
+            virtualDisplayManager?.destroy()
+            virtualDisplayManager = null
+            Log.i(TAG, "Backend re-detected: ${result.backend.capabilities.name}")
+            return true
+        }
+        Log.w(TAG, "Backend re-detection failed: $result")
+        return false
+    }
+
     fun stopAgent() {
         taskDisplayGuard?.stop()
         taskDisplayGuard = null
@@ -867,6 +1065,12 @@ class AgentService : Service() {
             return false
         }
 
+        // Prevent infinite recursion: if VD shows our own app, move it off the VD.
+        // Without this, SurfaceView → VD → OpenCyvis UI → SurfaceView → ... (套娃)
+        // Use backend (shell uid) for task queries — main process can't access hidden APIs.
+        // getTopTaskIdOnDisplay returns -1 if only OpenCyvis tasks are on VD.
+        // In that case we just proceed — the VD will show whatever was last rendered.
+
         // Launch ViewActivity — SurfaceView will connect to VD via setSurface()
         val intent = Intent(this, ai.opencyvis.ui.ViewActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -947,17 +1151,15 @@ class AgentService : Service() {
     private fun refreshControlledTasksFromVd(reason: String) {
         val vdm = virtualDisplayManager ?: return
         if (!vdm.isCreated) return
-        val task = vdm.getTopTaskOnDisplay(vdm.displayId)
-        if (task == null) {
+        // Use backend (shell uid) for task queries — main process can't access hidden APIs on real devices
+        val b = backend ?: return
+        val taskId = b.getTopTaskIdOnDisplay(vdm.displayId, packageName)
+        if (taskId <= 0) {
             Log.i(TAG, "No controlled VD task found while refreshing ($reason)")
             return
         }
-        if (task.containsPackage(packageName) || task.isHomeTask()) {
-            Log.i(TAG, "Ignoring non-controlled VD task while refreshing ($reason): $task")
-            return
-        }
-        taskDisplayGuard?.addControlledTask(task)
-        Log.d(TAG, "Refreshed controlled VD task ($reason): #${task.taskId}:${task.topPackage ?: task.basePackage}")
+        taskDisplayGuard?.addControlledTaskId(taskId)
+        Log.d(TAG, "Refreshed controlled VD task ($reason): #$taskId")
     }
 
     private fun TaskSnapshot.isHomeTask(): Boolean {
@@ -984,29 +1186,9 @@ class AgentService : Service() {
 
         taskRescueInProgress = true
         try {
-            val stateBefore = engine?.state?.value
-            val wasRunning = stateBefore is AgentState.Running
-            val wasTakeover = displayState == DisplayState.TAKEOVER
-
-            if (wasRunning) {
-                engine?.pause()
-            }
-
-            if (wasTakeover) {
-                displayState = DisplayState.VIEW
-            }
-
-            Log.w(TAG, "Recovering escaped controlled task ${task.taskId} from Display 0 to VD ${vdm.displayId}")
-            val moved = vdm.moveTaskToDisplay(task.taskId, vdm.displayId)
-            if (!moved) {
-                Log.w(TAG, "Failed to recover escaped task ${task.taskId}")
-            } else {
-                taskDisplayGuard?.addControlledTask(task.copy(displayId = vdm.displayId))
-            }
-
-            if (wasRunning) {
-                engine?.resume()
-            }
+            // TaskDisplayGuard already did moveTaskToDisplay; just bring our UI back to front
+            Log.i(TAG, "Escape callback for task ${task.taskId}, bringing UI to front on Display 0")
+            bringOpenCyvisUiToFront()
         } finally {
             taskRescueInProgress = false
         }
@@ -1021,20 +1203,28 @@ class AgentService : Service() {
             DisplayState.VIEW, DisplayState.TAKEOVER -> ai.opencyvis.ui.ViewActivity::class.java
             DisplayState.CHAT -> ai.opencyvis.ui.ControlPanelActivity::class.java
         }
-        Log.i(TAG, "bringOpenCyvisUiToFront: ${cls.simpleName}")
+        Log.i(TAG, "bringOpenCyvisUiToFront: ${cls.simpleName} on Display 0")
         val intent = Intent(this, cls).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
             if (cls == ai.opencyvis.ui.ViewActivity::class.java) {
                 putExtra(ai.opencyvis.ui.ViewActivity.EXTRA_SHOW_CONTROLS, true)
             }
         }
-        startActivity(intent)
+        val options = android.app.ActivityOptions.makeBasic()
+        try {
+            options.setLaunchDisplayId(0)
+        } catch (_: Exception) {}
+        startActivity(intent, options.toBundle())
     }
 
     // ── Public accessors ────────────────────────────────────────────────
 
     val stateFlow: StateFlow<AgentState>?
         get() = engine?.state
+
+    /** Non-null StateFlow for ImAgentBridge subscription (null value = no engine) */
+    val decisionFlow: StateFlow<AgentState?>
+        get() = engine?.state ?: MutableStateFlow(null)
 
     val stepResultFlow: SharedFlow<StepResult>?
         get() = engine?.stepResults
@@ -1057,10 +1247,17 @@ class AgentService : Service() {
                 addCategory(Intent.CATEGORY_SECONDARY_HOME)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            val options = android.app.ActivityOptions.makeBasic()
-                .setLaunchDisplayId(displayId)
-            startActivity(homeIntent, options.toBundle())
-            Log.i(TAG, "Launched secondary home on display $displayId")
+            val b = backend
+            if (b is RemoteBackend) {
+                val intentUri = homeIntent.toUri(Intent.URI_INTENT_SCHEME)
+                b.startActivityOnDisplay(intentUri, displayId)
+                Log.i(TAG, "Launched secondary home on display $displayId via backend")
+            } else {
+                val options = android.app.ActivityOptions.makeBasic()
+                    .setLaunchDisplayId(displayId)
+                startActivity(homeIntent, options.toBundle())
+                Log.i(TAG, "Launched secondary home on display $displayId")
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to launch home on display $displayId: ${e.message}")
             // Fallback: try regular home
@@ -1069,10 +1266,17 @@ class AgentService : Service() {
                     addCategory(Intent.CATEGORY_HOME)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
                 }
-                val opts = android.app.ActivityOptions.makeBasic()
-                    .setLaunchDisplayId(displayId)
-                startActivity(fallbackIntent, opts.toBundle())
-                Log.i(TAG, "Launched home (fallback) on display $displayId")
+                val b = backend
+                if (b is RemoteBackend) {
+                    val intentUri = fallbackIntent.toUri(Intent.URI_INTENT_SCHEME)
+                    b.startActivityOnDisplay(intentUri, displayId)
+                    Log.i(TAG, "Launched home (fallback) on display $displayId via backend")
+                } else {
+                    val opts = android.app.ActivityOptions.makeBasic()
+                        .setLaunchDisplayId(displayId)
+                    startActivity(fallbackIntent, opts.toBundle())
+                    Log.i(TAG, "Launched home (fallback) on display $displayId")
+                }
             } catch (e2: Exception) {
                 Log.w(TAG, "Failed to launch home fallback on display $displayId: ${e2.message}")
             }

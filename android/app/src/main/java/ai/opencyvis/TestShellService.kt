@@ -12,6 +12,11 @@ import java.io.FileDescriptor
 import java.io.PrintWriter
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * Shell command handler for `adb shell dumpsys opencyvis`.
@@ -50,6 +55,7 @@ class TestShellService : Binder() {
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun dump(fd: FileDescriptor, pw: PrintWriter, args: Array<out String>?) {
         val cmd = args?.firstOrNull() ?: "state"
@@ -62,6 +68,7 @@ class TestShellService : Binder() {
             "debug" -> handleDebug(pw, args ?: emptyArray())
             "simulate" -> handleSimulate(pw, args ?: emptyArray())
             "voice" -> handleVoice(pw, args ?: emptyArray())
+            "im" -> handleIm(pw, args ?: emptyArray())
             "help" -> handleHelp(pw)
             else -> {
                 pw.println("Unknown command: $cmd")
@@ -317,6 +324,120 @@ class TestShellService : Binder() {
         }
     }
 
+    private fun handleIm(pw: PrintWriter, args: Array<out String>) {
+        val subCmd = args.getOrNull(1)
+
+        when (subCmd) {
+            "state" -> handleImState(pw)
+            "inbound" -> handleImInject(pw, args)
+            "outbound" -> handleImOutbound(pw, args)
+            "fake" -> handleImFake(pw, args)
+            "set-pairing-code" -> handleImSetPairingCode(pw, args)
+            else -> {
+                pw.println("Unknown im command: $subCmd")
+                pw.println("Commands: state, inbound, outbound, fake, set-pairing-code")
+            }
+        }
+    }
+
+    private fun handleImState(pw: PrintWriter) {
+        val mgr = App.imChannelManager
+        if (mgr == null) {
+            pw.println("""{"running":false}""")
+            return
+        }
+        pw.println("""{"running":true,"outbound_count":${mgr.recentOutbound().size}}""")
+    }
+
+    private fun handleImInject(pw: PrintWriter, args: Array<out String>) {
+        val channel = args.getOrNull(2)
+        val senderId = args.getOrNull(3)
+        val chatId = args.getOrNull(4)
+        val text = args.drop(5).joinToString(" ")
+
+        if (channel.isNullOrBlank() || senderId.isNullOrBlank() || chatId.isNullOrBlank() || text.isBlank()) {
+            pw.println("ERROR: usage: dumpsys opencyvis im inbound <channel> <senderId> <chatId> <text>")
+            return
+        }
+
+        val mgr = App.imChannelManager
+        if (mgr == null) {
+            pw.println("ERROR: ImChannelManager not running")
+            return
+        }
+
+        runOnMain(pw) {
+            runBlocking {
+                mgr.injectInbound(channel, senderId, chatId, text)
+            }
+        }
+    }
+
+    private fun handleImOutbound(pw: PrintWriter, args: Array<out String>) {
+        val limit = args.getOrNull(2)?.toIntOrNull() ?: 16
+        val mgr = App.imChannelManager
+        if (mgr == null) {
+            pw.println("[]")
+            return
+        }
+        val records = mgr.recentOutbound(limit)
+        val json = records.joinToString(",", "[", "]") { r ->
+            """{"channel":"${r.channel}","chatId":"${r.chatId}","kind":"${r.kind}","text":"${escapeJson(r.text ?: "")}","photo_bytes":${r.photoBytes},"ts":${r.timestamp}}"""
+        }
+        pw.println(json)
+    }
+
+    private fun handleImFake(pw: PrintWriter, args: Array<out String>) {
+        val mode = args.getOrNull(2)
+        val mgr = App.imChannelManager
+        if (mgr == null) {
+            pw.println("ERROR: ImChannelManager not running")
+            return
+        }
+        when (mode) {
+            "on" -> {
+                scope.launch {
+                    mgr.replaceWithFake("telegram")
+                    mgr.replaceWithFake("feishu")
+                    pw.println("OK: fake mode enabled")
+                }
+            }
+            "off" -> {
+                pw.println("OK: fake mode requires service restart to restore real channels")
+            }
+            else -> pw.println("ERROR: usage: dumpsys opencyvis im fake on|off")
+        }
+    }
+
+    private fun handleImSetPairingCode(pw: PrintWriter, args: Array<out String>) {
+        val channelId = args.getOrNull(2)
+        val code = args.getOrNull(3)
+
+        if (channelId.isNullOrBlank()) {
+            pw.println("ERROR: usage: dumpsys opencyvis im set-pairing-code <channel> [code]")
+            return
+        }
+
+        val mgr = App.imPairingManager
+        if (mgr == null) {
+            pw.println("ERROR: ImPairingManager not running")
+            return
+        }
+
+        val generatedCode = if (code.isNullOrBlank()) {
+            mgr.generateCode(channelId)
+        } else {
+            // Inject a known code for testing via reflection
+            val codesField = mgr.javaClass.getDeclaredField("codes")
+            codesField.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            val codes = codesField.get(mgr) as MutableMap<String, Pair<String, Long>>
+            codes[channelId] = Pair(code, System.currentTimeMillis())
+            code
+        }
+        pw.println("""{"channel":"$channelId","code":"$generatedCode"}""")
+    }
+
     private fun handleHelp(pw: PrintWriter) {
         pw.println("Usage: dumpsys opencyvis <command>")
         pw.println()
@@ -342,6 +463,12 @@ class TestShellService : Binder() {
         pw.println("    simulate handoff <reason>")
         pw.println("  voice <target> <text>          Inject voice input result")
         pw.println("    Targets: command, control_answer, view_answer")
+        pw.println("  im <subcommand>               IM remote control commands")
+        pw.println("    im state                     Show IM channel state")
+        pw.println("    im inbound <ch> <sid> <cid> <text> Inject inbound message")
+        pw.println("    im outbound [limit]          Show recent outbound records")
+        pw.println("    im fake on|off               Toggle fake channel mode (debug only)")
+        pw.println("    im set-pairing-code <ch> [code] Set pairing code (generates if no code)")
         pw.println("  help                           Show this help")
     }
 

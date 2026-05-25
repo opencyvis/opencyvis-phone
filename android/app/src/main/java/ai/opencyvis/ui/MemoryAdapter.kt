@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import ai.opencyvis.R
 import ai.opencyvis.db.GlobalMemoryEntity
@@ -49,7 +50,7 @@ class MemoryAdapter(
             valueText.text = memory.value
             enabledText.text = if (memory.enabled) ctx.getString(R.string.memory_status_enabled) else ctx.getString(R.string.memory_status_disabled)
             enabledText.setTextColor(
-                android.graphics.Color.parseColor(if (memory.enabled) "#4ADE80" else "#777777")
+                ContextCompat.getColor(ctx, if (memory.enabled) R.color.color_success else R.color.text_subtitle)
             )
             val source = if (memory.source == GlobalMemoryEntity.SOURCE_AI) ctx.getString(R.string.memory_source_ai) else ctx.getString(R.string.memory_source_user)
             val category = if (memory.category.isBlank()) ctx.getString(R.string.memory_uncategorized) else memory.category

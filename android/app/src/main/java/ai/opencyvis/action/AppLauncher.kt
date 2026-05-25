@@ -4,11 +4,14 @@ import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import ai.opencyvis.backend.PrivilegeBackend
+import ai.opencyvis.backend.RemoteBackend
 
 /**
  * Result of a launch attempt.
@@ -20,8 +23,16 @@ data class LaunchResult(val description: String, val packageName: String?)
 /**
  * Launches apps by name using Intent-based approach.
  * Ports APP_INTENTS from Python actions.py.
+ *
+ * When using RemoteBackend on a non-zero displayId, launches are delegated
+ * to the privileged service (shell uid) via startActivityOnDisplay() to avoid
+ * Permission Denial from the app process not owning the VD.
  */
-class AppLauncher(private val context: Context, private val displayId: Int = 0) {
+class AppLauncher(
+    private val context: Context,
+    private val displayId: Int = 0,
+    private val backend: PrivilegeBackend? = null
+) {
 
     companion object {
         private const val TAG = "AppLauncher"
@@ -172,6 +183,30 @@ class AppLauncher(private val context: Context, private val displayId: Int = 0) 
     }
 
     /**
+     * Whether to route activity launch through the privileged backend.
+     * True when using RemoteBackend on a non-zero display (shell uid owns the VD).
+     */
+    private val useRemoteLaunch: Boolean
+        get() = displayId != 0 && backend is RemoteBackend
+
+    /**
+     * Start an activity, routing through the backend if needed for display ownership.
+     * Returns true on success.
+     */
+    private fun startActivityForDisplay(intent: Intent): Boolean {
+        if (useRemoteLaunch) {
+            // Route through privileged service — shell uid can start on any display
+            intent.addFlags(launchFlagsForDisplay(displayId))
+            val intentUri = intent.toUri(Intent.URI_INTENT_SCHEME)
+            Log.i(TAG, "Launching via backend.startActivityOnDisplay (display=$displayId)")
+            return backend!!.startActivityOnDisplay(intentUri, displayId)
+        }
+        // Direct launch (system app or display 0)
+        context.startActivity(intent, launchOptionsBundle())
+        return true
+    }
+
+    /**
      * Launch an app by name. Returns a [LaunchResult] with description and package name.
      */
     fun launch(appName: String): LaunchResult {
@@ -184,7 +219,10 @@ class AppLauncher(private val context: Context, private val displayId: Int = 0) 
                 val intent = intentFactory().apply {
                     addFlags(launchFlagsForDisplay(displayId))
                 }
-                context.startActivity(intent, launchOptionsBundle())
+                val ok = startActivityForDisplay(intent)
+                if (!ok) {
+                    return LaunchResult("Failed to open $appName on display $displayId (backend rejected)", null)
+                }
                 val pkg = intent.component?.packageName
                     ?: intent.`package`
                     ?: KNOWN_APP_PACKAGES[key]
@@ -217,7 +255,10 @@ class AppLauncher(private val context: Context, private val displayId: Int = 0) 
             val launchIntent = pm.getLaunchIntentForPackage(pkg) ?: continue
             return try {
                 launchIntent.addFlags(launchFlagsForDisplay(displayId))
-                context.startActivity(launchIntent, launchOptionsBundle())
+                val ok = startActivityForDisplay(launchIntent)
+                if (!ok) {
+                    return LaunchResult("Failed to open $appName on display $displayId (backend rejected)", null)
+                }
                 LaunchResult(
                     "Opened $appName ($pkg)" + if (displayId != 0) " on display $displayId" else "",
                     pkg
@@ -232,31 +273,68 @@ class AppLauncher(private val context: Context, private val displayId: Int = 0) 
 
     private fun launchByPackageSearch(appName: String): LaunchResult {
         val pm = context.packageManager
-        val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val launchableApps = pm.queryIntentActivities(intent, 0)
 
-        for (appInfo in packages) {
-            val label = pm.getApplicationLabel(appInfo).toString()
+        // 1. Exact label match
+        for (ri in launchableApps) {
+            val label = ri.loadLabel(pm).toString()
+            if (label.equals(appName, ignoreCase = true)) {
+                return launchResolveInfo(ri, appName, pm)
+            }
+        }
+
+        // 2. Substring match on label or package name
+        for (ri in launchableApps) {
+            val label = ri.loadLabel(pm).toString()
+            val pkg = ri.activityInfo.packageName
             if (label.contains(appName, ignoreCase = true) ||
-                appInfo.packageName.contains(appName, ignoreCase = true)
+                appName.contains(label, ignoreCase = true) ||
+                pkg.contains(appName, ignoreCase = true)
             ) {
-                val launchIntent = pm.getLaunchIntentForPackage(appInfo.packageName)
-                if (launchIntent != null) {
-                    return try {
-                        launchIntent.addFlags(launchFlagsForDisplay(displayId))
-                        context.startActivity(launchIntent, launchOptionsBundle())
-                        LaunchResult(
-                            "Opened $appName (${appInfo.packageName})" + if (displayId != 0) " on display $displayId" else "",
-                            appInfo.packageName
-                        )
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to launch ${appInfo.packageName}", e)
-                        LaunchResult("Failed to open $appName: ${e.message}", null)
-                    }
-                }
+                return launchResolveInfo(ri, appName, pm)
             }
         }
 
         Log.w(TAG, "App '$appName' not found in known intents or packages")
-        return LaunchResult("Could not find app: $appName", null)
+        return LaunchResult(
+            "Could not find app: $appName. Use list_apps(keyword) to search installed apps",
+            null
+        )
+    }
+
+    private fun launchResolveInfo(ri: ResolveInfo, appName: String, pm: PackageManager): LaunchResult {
+        val pkg = ri.activityInfo.packageName
+        val launchIntent = pm.getLaunchIntentForPackage(pkg)
+            ?: return LaunchResult("App $appName ($pkg) has no launch intent", null)
+        return try {
+            launchIntent.addFlags(launchFlagsForDisplay(displayId))
+            val ok = startActivityForDisplay(launchIntent)
+            if (!ok) {
+                return LaunchResult("Failed to open $appName on display $displayId (backend rejected)", null)
+            }
+            LaunchResult(
+                "Opened $appName ($pkg)" + if (displayId != 0) " on display $displayId" else "",
+                pkg
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch $pkg", e)
+            LaunchResult("Failed to open $appName: ${e.message}", null)
+        }
+    }
+
+    fun listApps(keyword: String? = null): List<String> {
+        val pm = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val ownPackages = setOf(context.packageName, "ai.opencyvis")
+        return pm.queryIntentActivities(intent, 0)
+            .filter { it.activityInfo.packageName !in ownPackages }
+            .map { it.loadLabel(pm).toString() }
+            .filter { label ->
+                keyword.isNullOrBlank() ||
+                label.contains(keyword, ignoreCase = true)
+            }
+            .distinct()
+            .sorted()
     }
 }

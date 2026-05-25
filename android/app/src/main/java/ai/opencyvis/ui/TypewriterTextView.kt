@@ -52,6 +52,7 @@ class TypewriterTextView @JvmOverloads constructor(
     }
 
     fun animateText(newText: String) {
+        if (newText == fullText && charIndex < fullText.length) return
         handler.removeCallbacksAndMessages(null)
         fullText = newText
         charIndex = 0

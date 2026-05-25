@@ -119,6 +119,12 @@ class AgentTestCase:
     pre_steps: ClassVar[list[str] | None] = None
     post_steps: ClassVar[list[str] | None] = None
 
+    # Extra deeplink params appended to mock setup deeplink (e.g. im_remote_enabled=true)
+    extra_deeplink_params: ClassVar[dict[str, str] | None] = None
+
+    # Skip the main dumpsys start instruction — for scenarios driven entirely by post_steps (e.g. IM cold start)
+    skip_start_agent: ClassVar[bool] = False
+
     @classmethod
     def name(cls) -> str:
         return cls.__name__
@@ -166,7 +172,7 @@ class TestRunner:
         # 2. Setup mock LLM if needed
         if use_mock:
             print(f"[{_ts()}]    setting up mock LLM server…")
-            if not self._setup_mock_llm(case.mock_responses, max_steps=case.max_steps):
+            if not self._setup_mock_llm(case.mock_responses, max_steps=case.max_steps, extra_params=case.extra_deeplink_params):
                 state.finish_reason = "mock LLM setup failed"
                 state.elapsed = time.time() - t0
                 return self._make_result(case, state)
@@ -186,9 +192,17 @@ class TestRunner:
                 state.elapsed = time.time() - t0
                 return self._make_result(case, state)
 
-            # 4. Start agent via dumpsys
-            out = adb_utils.start_agent(self.config.serial, instruction=case.instruction)
-            print(f"[{_ts()}]    start → {out.strip()}")
+            # 4. Start agent via dumpsys (unless skip_start_agent)
+            if case.skip_start_agent:
+                print(f"[{_ts()}]    skipping start_agent (driven by post_steps)")
+                # For skip_start_agent scenarios, execute post_steps BEFORE monitor
+                # since they drive the agent (e.g. IM inbound messages)
+                if case.post_steps:
+                    print(f"[{_ts()}]    running {len(case.post_steps)} post_steps (pre-monitor)…")
+                    adb_utils.execute_steps(self.config.serial, case.post_steps)
+            else:
+                out = adb_utils.start_agent(self.config.serial, instruction=case.instruction)
+                print(f"[{_ts()}]    start → {out.strip()}")
 
             # 5. Monitor logcat
             if case.trigger_commands:
@@ -209,8 +223,8 @@ class TestRunner:
 
             state.elapsed = time.time() - t0
 
-            # 6. Execute post_steps
-            if case.post_steps:
+            # 6. Execute post_steps (already ran for skip_start_agent)
+            if case.post_steps and not case.skip_start_agent:
                 print(f"[{_ts()}]    running {len(case.post_steps)} post_steps…")
                 adb_utils.execute_steps(self.config.serial, case.post_steps)
 
@@ -233,7 +247,7 @@ class TestRunner:
 
         return result
 
-    def _setup_mock_llm(self, responses: list[dict], max_steps: int = 20) -> bool:
+    def _setup_mock_llm(self, responses: list[dict], max_steps: int = 20, extra_params: dict | None = None) -> bool:
         """Start mock server, configure adb reverse, set app config via deeplink."""
         try:
             self._mock_server = MockLLMServer(self.MOCK_PORT)
@@ -268,6 +282,10 @@ class TestRunner:
                 f"\\&api_key=fake-test-key"
                 f"\\&max_steps={max_steps}"
             )
+            # Append per-scenario extra deeplink params
+            if extra_params:
+                for k, v in extra_params.items():
+                    deeplink += f"\\&{k}={v}"
             adb_utils.adb_run(
                 "shell", "am", "start", "-a", "android.intent.action.VIEW",
                 "-d", deeplink, "-p", adb_utils.PACKAGE,
@@ -326,16 +344,25 @@ class TestRunner:
         state: RunState,
         t0: float,
     ) -> None:
+        import select
         _ts = lambda: time.strftime("%H:%M:%S")
 
-        for raw_line in proc.stdout:
-            line = raw_line.strip()
+        while True:
             elapsed = time.time() - t0
-
             if elapsed > case.timeout:
                 state.finish_reason = f"TIMEOUT after {case.timeout}s"
                 print(f"[{_ts()}]    ✗ TIMEOUT")
                 break
+
+            # Wait up to 1s for logcat data, then re-check timeout
+            ready, _, _ = select.select([proc.stdout], [], [], 1.0)
+            if not ready:
+                continue
+
+            raw_line = proc.stdout.readline()
+            if not raw_line:
+                break
+            line = raw_line.strip()
 
             if not line:
                 continue

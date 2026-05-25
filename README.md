@@ -1,13 +1,12 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/github-banner-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset=".github/github-banner-light.png">
-  <img alt="OpenCyvis" src=".github/github-banner-light.png" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="github-banner-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="github-banner-light.png">
+  <img alt="OpenCyvis" src="github-banner-light.png" width="100%">
 </picture>
 
 <p align="center">
   <strong>The open-source AI phone.</strong><br>
-  Commercial AI phones are black boxes. This one isn't.<br>
-  <strong>v2.0 is coming — and it works on any phone.</strong><br><br>
+  Commercial AI phones are black boxes. This one isn't.<br><br>
   <sub><b>Open</b> <b>Cy</b>ber Jar<b>vis</b></sub>
 </p>
 
@@ -20,8 +19,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
-  <a href="#v20-preview"><img src="https://img.shields.io/badge/v2.0-coming_soon-D4A039.svg" alt="v2.0 coming soon"></a>
-  <a href="#getting-started"><img src="https://img.shields.io/badge/v1.0-source_available-34A853.svg?logo=android&logoColor=white" alt="v1.0 source available"></a>
+  <a href="#getting-started"><img src="https://img.shields.io/badge/v2.0-released-34A853.svg?logo=android&logoColor=white" alt="v2.0 released"></a>
   <a href="#"><img src="https://img.shields.io/badge/Kotlin-2.0-7F52FF.svg?logo=kotlin&logoColor=white" alt="Kotlin"></a>
   <a href="#supported-models"><img src="https://img.shields.io/badge/LLMs_Tested-9_models-FF6F00.svg" alt="LLMs"></a>
   <a href="#"><img src="https://img.shields.io/badge/Tests-107+-brightgreen.svg" alt="Tests"></a>
@@ -29,41 +27,17 @@
 
 ---
 
-## v2.0 Preview
-
-v2.0 is being prepared as a normal app-based experience: no custom ROM required, no computer setup for everyday use. Install the app, follow the setup guide, and let OpenCyvis work from your Android phone.
-
-What is new:
-
-- **Works on any Android phone** — no custom ROM, no computer needed for the v2.0 setup path
-- **Remote control via chat** — send tasks from Telegram or Feishu, receive results and screenshots in chat
-- **Routines** — save frequent tasks and run them again with one tap
-- **Dark mode** — full day/night theme
-- **Multiple ROM support** — adapted for MIUI, ColorOS, OriginOS, and other Android variants
-
-**v2.0 will be open source soon.** v1.0 remains available today for developers who want to build from source.
-
----
-
-## Why
-
-When a company ships an "AI phone," they get full access to your screen, your apps, your messages, your banking — and you can't see what model is running, can't verify what data leaves your device, can't choose an alternative.
-
-Doubao AI Phone? Locked to ByteDance's model. Samsung Galaxy AI? Locked to Samsung + Google. Google's built-in AI? Gemini only. You get whatever they decide to give you.
-
-**You should at least have the choice.**
-
-OpenCyvis is the open-source alternative: you see every line of code, you pick the AI model, you decide where your data goes. With a local model, nothing ever leaves your device.
-
----
-
 ## What It Does
 
 OpenCyvis turns Android into an AI phone. Give it a task in natural language — it sees your screen, understands the UI, and operates apps just like you would.
 
-**"Find the best-rated coffee shop nearby and get directions"** — opens Maps, searches, sorts by rating, taps the top result, starts navigation.
+**"Reply 'let's go eat sushi' in WeChat"** — opens WeChat, finds the conversation, types and sends:
 
-**"Look up flights to Tokyo next Friday — find the cheapest direct one"** — opens the travel app, enters dates, filters direct flights, sorts by price.
+<p align="center">
+  <img src="docs/demos/wechat_reply.gif" width="300" alt="WeChat reply demo">
+</p>
+
+**"Find the best-rated coffee shop nearby and get directions"** — opens Maps, searches, sorts by rating, taps navigate.
 
 **"Set a 7am alarm, turn on Do Not Disturb, and switch to dark mode"** — chains Clock, Settings, and Display in one go.
 
@@ -83,14 +57,79 @@ Most AI tools lock your screen while they work. OpenCyvis operates on a **virtua
       You use this              AI uses this
 ```
 
-Watch the AI work anytime. Take over if something looks wrong. Hand it back when you're done. It picks up right where you left off.
+Watch the AI work anytime. Take over if something looks wrong. Hand it back when you're done.
 
 <p align="center">
-  <img src="docs/screenshots/en/home-clean.png" width="260" alt="OpenCyvis v2 clean home screen with routines">
+  <img src="docs/demos/home_screen.png" width="260" alt="OpenCyvis v2 home screen">
 </p>
+
+---
+
+## Why
+
+When a company ships an "AI phone," they get full access to your screen, your apps, your messages — and you can't see what model is running, can't verify what data leaves your device, can't choose an alternative.
+
+**You should at least have the choice.**
+
+OpenCyvis is the open-source alternative: you see every line of code, you pick the AI model, you decide where your data goes. With a local model, nothing ever leaves your device.
+
+---
+
+## Two Install Modes
+
+### Standard Mode
+
+For most users. No custom ROM, no root, no computer.
+
+1. Download and install the APK
+2. Open the app, follow the setup wizard to complete ADB wireless pairing
+3. Choose your LLM backend (cloud or local), start using
+
+The entire pairing process completes on-device. Supports Android 11+.
+
+### System App Mode
+
+For developers and power users.
+
+Flash an AOSP system image. The app runs as a system application with full platform signing privileges. Screenshots use `SurfaceControl` directly — fastest possible. Full virtual display task management via system APIs.
+
+### How they relate
+
+Same AI engine, same LLM backends, same UI, same capabilities. The only difference is how the app obtains system permissions. Standard mode uses ADB shell privileges; System App mode uses platform signing. For everyday tasks, you won't notice the difference.
+
+---
+
+## v2.0 New Features
+
+### Remote Control via IM
+
+Send messages to a bot in your IM app to control the phone's AI remotely. Currently supports **Feishu** and **Telegram**.
+
+Use case: Install OpenCyvis on a parent's phone. Mom says "the text is too small" — you send "set font size to largest" in IM. The AI does it and sends back a confirmation screenshot. No need for both parties to watch the screen simultaneously.
+
+Supports: sending commands, receiving progress, viewing screenshots, answering the AI's questions, stopping tasks. Pairing uses a 6-digit code.
+
 <p align="center">
-  <sub>v2 preview: clean home and routines</sub>
+  <img src="docs/demos/feishu_remote.png" width="300" alt="Remote control via Feishu">
 </p>
+
+### Routines
+
+Save frequent operations and run them on a schedule or with one tap.
+
+Example: "Check calendar, weather, and unread emails every morning at 8am" — the AI runs automatically and pushes a summary to chat. Also supports geofencing — auto clock-in when arriving at the office.
+
+### Provider Profiles
+
+Save multiple AI configurations (e.g., cloud Qwen, local Gemma 4, Claude) and switch between them with one tap. No need to re-enter API URLs and keys each time.
+
+### Dark Mode
+
+Full day/night theme. Follows system settings or set manually. All screens — home, chat, settings, watch mode — have matching dark variants.
+
+### Multi-ROM Support
+
+Standard mode now supports MIUI, ColorOS, OriginOS, and other vendor ROMs. Different manufacturers have vastly different wireless debugging entry points — OemHelper handles the differences.
 
 ---
 
@@ -108,50 +147,49 @@ Watch the AI work anytime. Take over if something looks wrong. Hand it back when
 
 ---
 
-## Features
-
-- **Works on any Android phone** — v2.0 removes the custom ROM path for everyday users
-- **Remote control via chat** — send tasks from Telegram or Feishu and get results back in the same conversation
-- **Routines** — save frequent tasks and run them again with one tap
-- **Dark mode** — full day/night theme for the app and control surface
-- **Multiple ROM support** — adapted for MIUI, ColorOS, OriginOS, and other Android variants
-- **Background operation** — AI works in its own space; your phone stays free
-- **Any AI model** — Qwen, Claude, GPT, Llama, Gemma, or local/private options
-- **Natural language** — describe what you want in plain text or voice
-- **Understands screens** — reads what is visible and acts on the right controls
-- **Watch & takeover** — observe the AI in real time, take control anytime, hand back seamlessly
-- **Asks when unsure** — pauses on ambiguity ("Which Zhang Wei? I see three") instead of guessing
-- **Safety guards** — repeated action detection, confirmation for sensitive operations
-- **Offline voice** — on-device speech recognition (Sherpa-ONNX), no internet needed
-- **Open source** — audit the code instead of trusting a black box
-
----
-
 ## Supported Models
 
-OpenCyvis is model-agnostic. Bring your own AI account, connect a private service, or run a local model when privacy matters most.
+OpenCyvis is model-agnostic. Bring your own AI account, connect a private service, or run a local model.
 
-| Provider | Examples | Notes |
-|:---|:---|:---|
-| **Cloud models** | Qwen, GPT, Claude | Use a hosted model when you want the best quality and speed |
-| **Private services** | Team or personal server | Route requests through infrastructure you control |
-| **Local models** | Gemma, Llama, Qwen | Run tasks without sending phone context to a third-party service |
+### Cloud Models
 
-### Local Model Benchmarks
+| Model | Latency per step | Pass Rate | Notes |
+|:---|:---:|:---:|:---|
+| **Qwen 3.5 Plus** | 4-6s | 4/4 | Stable, recommended |
+| **Claude Opus 4** | 4-8s | 4/4 | Highest reasoning quality |
+| **MiMo v2.5** | 2.3-4.5s | 4/4 | Fastest |
+| **GPT-4o** | 3-6s | 3/4 | Occasionally ignores tool_choice |
 
-We tested 6 local models on 4 real-world UI scenarios (open settings, dial a number, handle impossible tasks, find a contact):
+### Local Models (via Ollama)
 
 | Model | Size | Speed | Pass Rate |
 |:---|:---:|:---:|:---:|
 | **Gemma 4 26B-A4B** Q4 | 17 GB | 63 tok/s | **4/4** |
 | **Gemma 4 E2B** Q4 | 1.8 GB | 41 tok/s | **4/4** |
-| **Gemma 4 31B** Q4 | 19 GB | 16 tok/s | 4/4 |
 | **Qwen 3.5 35B-A3B** Q4 | 22 GB | 47 tok/s | 3/4 |
 | **Gemma 4 E4B** Q4 | 3 GB | 61 tok/s | 3/4 |
-| **GUI-Owl 1.5 8B** Q4 | 5.4 GB | 75 tok/s | 2/4 |
 
 > **Recommended:** Gemma 4 26B-A4B — best balance of speed, quality, and memory.  
 > **Minimal:** Gemma 4 E2B — just 1.8 GB, still passes all 4 tests.
+
+---
+
+## Architecture
+
+Both install modes share all upper-layer code. The difference is only in the privilege layer, isolated behind a `PrivilegeBackend` interface:
+
+| | SystemBackend | RemoteBackend |
+|---|---|---|
+| Privilege source | Platform signing (uid system) | ADB shell (uid 2000) |
+| Input injection | InputManager reflection | AIDL proxy to PrivilegedService |
+| Screenshot | SurfaceControl.screenshot() | ImageReader from VD Surface |
+| VD task management | ActivityTaskManager reflection | PrivilegedService proxy |
+
+The backend is selected automatically at runtime.
+
+<p align="center">
+  <img src="docs/demos/backend_architecture.png" width="500" alt="Dual backend architecture">
+</p>
 
 ---
 
@@ -159,85 +197,66 @@ We tested 6 local models on 4 real-world UI scenarios (open settings, dial a num
 
 An AI agent with full phone access is one of the most privileged pieces of software you can run. This is not a place for "trust us."
 
-- **Task context is handled only for the work you ask OpenCyvis to do**
 - **You choose the AI service** — hosted, private, or local
 - **No telemetry, no analytics, no phone-home** — zero tracking code
-- **Open source** — security researchers, journalists, anyone can audit
-- **Local model option** — for maximum privacy
-
-```
-Your task ──→ OpenCyvis (on your phone) ──→ Your chosen AI ──→ Result
-                                      ↑
-                         You choose where requests go
-```
+- **Open source** — anyone can audit
+- **Local model option** — nothing leaves your device
 
 ---
 
 ## Getting Started
 
-### v2.0 — coming soon
+### Download
 
-v2.0 is being prepared for a simple app-based setup:
+Two APKs are available on the [Releases](https://github.com/opencyvis/opencyvis-phone/releases) page:
 
-1. Install the app
-2. Follow the setup wizard
-3. Start sending tasks
+| APK | For | Package ID |
+|:---|:---|:---|
+| `opencyvis-standard-release.apk` | Most users — install on any Android 11+ phone | `ai.opencyvis.standard` |
+| `opencyvis-system-release.apk` | Developers — flash into AOSP as a system app | `ai.opencyvis` |
 
-### v1.0 — available now
+### Standard Mode (recommended)
 
-v1.0 remains available for developers who want to build and deploy from source. The requirements below apply to **v1.0 only**.
+1. Download `opencyvis-standard-release.apk` and install
+2. Open the app, follow the setup wizard to complete wireless pairing
+3. Configure your LLM provider in Settings
+4. Start sending tasks
 
-#### v1.0 Requirements
+No root, no computer, no custom ROM required.
 
-- AOSP system image
-- Platform key signing (system app privileges)
+### System App Mode
 
-These are not the planned v2.0 requirements. OpenCyvis v1.0 is a privileged system application, so it requires system-level access for screen capture and input injection.
-
-#### Build from source
+For developers building a custom AOSP image:
 
 ```bash
 git clone https://github.com/opencyvis/opencyvis-phone.git
 cd opencyvis-phone/android
-./gradlew assembleRelease
+./gradlew assembleSystemRelease
 ```
 
-#### Deploy to device
+See [android/README-AOSP.md](android/README-AOSP.md) for AOSP deployment and platform key signing.
 
-See [docs/aosp-deployment.md](docs/aosp-deployment.md) for deploying on AOSP-compatible devices — covers symlink setup, device makefile, and platform key signing.
+### Configure LLM
 
-#### No device? Try the emulator
-
-```bash
-./scripts/deploy-emu.sh
-```
-
-#### Configure
-
-Set your LLM provider in-app, or via deeplink:
+Set your provider in-app, or via deeplink:
 
 ```bash
-# Local Ollama (fully private, no API key)
+# Local Ollama (fully private)
 adb shell am start -a android.intent.action.VIEW \
   -d "opencyvis://config?provider=ollama&base_url=http://localhost:11434&model=gemma4:26b"
 
 # Cloud API
 adb shell am start -a android.intent.action.VIEW \
-  -d "opencyvis://config?provider=openai&base_url=https://api.openai.com/v1&api_key=YOUR_KEY&model=qwen-vl-max"
+  -d "opencyvis://config?provider=openai&base_url=https://api.example.com/v1&api_key=YOUR_KEY&model=qwen-vl-max"
 ```
 
 ---
 
 ## Roadmap
 
-### Next
-- v2.0 app-based setup
-- Remote IM control polish
-- Routines and settings UX
+- Explore more convenient privilege acquisition methods
+- Further optimize local model support
 - Cross-device coordination (phone + desktop)
-
-### Vision
-- AI phones should be public infrastructure, not proprietary products. Our goal is to build an open standard for mobile AI agents — one that anyone can own, audit, and control.
 
 ---
 

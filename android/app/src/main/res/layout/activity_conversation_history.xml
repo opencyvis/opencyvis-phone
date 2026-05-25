@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#FF0D0D0D"
+    android:background="@color/surface"
     android:fitsSystemWindows="true">
 
     <LinearLayout
@@ -22,7 +22,7 @@
             android:text="←"
             android:textSize="18sp"
             android:minWidth="44dp"
-            android:textColor="#80A0FF" />
+            android:textColor="@color/text_back_button" />
 
         <TextView
             android:layout_width="0dp"
@@ -30,7 +30,7 @@
             android:layout_weight="1"
             android:text="Conversation History"
             android:textSize="18sp"
-            android:textColor="#E0FFFFFF"
+            android:textColor="@color/on_surface"
             android:fontFamily="sans-serif-medium"
             android:letterSpacing="0.02" />
     </LinearLayout>
@@ -38,7 +38,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#1AFFFFFF" />
+        android:background="@color/surface_overlay_10" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_conversations"
@@ -46,5 +46,5 @@
         android:layout_height="match_parent"
         android:padding="16dp"
         android:clipToPadding="false"
-        android:background="#FF0D0D0D" />
+        android:background="@color/surface" />
 </LinearLayout>

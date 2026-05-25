@@ -36,6 +36,10 @@ class ConfigRepositoryTest {
                 prefsStore[invocation.getArgument(0)] = invocation.getArgument<Boolean>(1)
                 mockEditor
             }
+            on { remove(any()) } doAnswer { invocation ->
+                prefsStore.remove(invocation.getArgument(0))
+                mockEditor
+            }
             on { apply() } doAnswer { /* no-op */ }
             on { commit() } doReturn true
         }
@@ -156,10 +160,10 @@ class ConfigRepositoryTest {
     }
 
     @Test
-    fun `setting maxSteps calls editor putInt and apply`() {
+    fun `setting maxSteps calls editor putString and apply`() {
         val repo = ConfigRepository(mockContext)
         repo.maxSteps = 20
-        verify(mockEditor).putInt(eq("max_steps"), eq(20))
+        verify(mockEditor).putString(eq("max_steps"), eq("20"))
         verify(mockEditor).apply()
     }
 

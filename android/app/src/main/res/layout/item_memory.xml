@@ -18,7 +18,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textColor="#E0E0E0"
+            android:textColor="@color/on_surface"
             android:textSize="14sp"
             android:fontFamily="sans-serif-medium"
             android:maxLines="1"
@@ -28,7 +28,7 @@
             android:id="@+id/text_enabled"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#4ADE80"
+            android:textColor="@color/color_success"
             android:textSize="11sp" />
     </LinearLayout>
 
@@ -37,7 +37,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:textColor="#B0FFFFFF"
+        android:textColor="@color/on_surface_medium"
         android:textSize="13sp"
         android:lineSpacingMultiplier="1.25" />
 
@@ -46,6 +46,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:textColor="#555555"
+        android:textColor="@color/text_subtitle"
         android:textSize="11sp" />
 </LinearLayout>

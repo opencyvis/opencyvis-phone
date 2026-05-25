@@ -45,25 +45,26 @@ object ImageUtil {
         return rgbBitmap
     }
 
-    /**
-     * Encode bitmap as JPEG base64 string.
-     */
-    fun toJpegBase64(bitmap: Bitmap, quality: Int = JPEG_QUALITY): String {
+    fun toJpegBytes(bitmap: Bitmap, quality: Int = JPEG_QUALITY): ByteArray {
         val stream = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
-        return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+        return stream.toByteArray()
     }
 
-    /**
-     * Full pipeline: resize → convert to RGB → JPEG base64.
-     */
-    fun processScreenshot(bitmap: Bitmap): String {
+    fun toJpegBase64(bitmap: Bitmap, quality: Int = JPEG_QUALITY): String {
+        return Base64.encodeToString(toJpegBytes(bitmap, quality), Base64.NO_WRAP)
+    }
+
+    fun processScreenshotToBytes(bitmap: Bitmap): ByteArray {
         val resized = resizeToMaxWidth(bitmap)
         val rgb = convertToRgb(resized)
-        val base64 = toJpegBase64(rgb)
-        // Recycle intermediate bitmaps (only if they are different objects from input)
+        val bytes = toJpegBytes(rgb)
         if (rgb !== resized) rgb.recycle()
         if (resized !== bitmap) resized.recycle()
-        return base64
+        return bytes
+    }
+
+    fun processScreenshot(bitmap: Bitmap): String {
+        return Base64.encodeToString(processScreenshotToBytes(bitmap), Base64.NO_WRAP)
     }
 }

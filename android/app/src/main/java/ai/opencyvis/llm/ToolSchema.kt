@@ -34,6 +34,7 @@ object ToolSchema {
                             put("handoff_user")
                             put("note")
                             put("remember")
+                            put("save_routine")
                         })
                         put("description", LlmPrompts.paramDescription("action_type"))
                     })
@@ -101,15 +102,59 @@ object ToolSchema {
                         put("type", "string")
                         put("description", LlmPrompts.paramDescription("memory_category"))
                     })
-                    put("completed", JSONObject().apply {
+                    put("routine_name", JSONObject().apply {
+                        put("type", "string")
+                        put("description", LlmPrompts.paramDescription("routine_name"))
+                    })
+                    put("routine_icon", JSONObject().apply {
+                        put("type", "string")
+                        put("description", LlmPrompts.paramDescription("routine_icon"))
+                    })
+                    put("routine_instruction", JSONObject().apply {
+                        put("type", "string")
+                        put("description", LlmPrompts.paramDescription("routine_instruction"))
+                    })
+                    put("schedule_type", JSONObject().apply {
+                        put("type", "string")
+                        put("enum", JSONArray().apply {
+                            put("time")
+                            put("interval")
+                            put("geofence")
+                        })
+                        put("description", LlmPrompts.paramDescription("schedule_type"))
+                    })
+                    put("schedule_time", JSONObject().apply {
+                        put("type", "string")
+                        put("description", LlmPrompts.paramDescription("schedule_time"))
+                    })
+                    put("schedule_repeat", JSONObject().apply {
+                        put("type", "string")
+                        put("description", LlmPrompts.paramDescription("schedule_repeat"))
+                    })
+                    put("schedule_interval", JSONObject().apply {
+                        put("type", "integer")
+                        put("description", LlmPrompts.paramDescription("schedule_interval"))
+                    })
+                    put("schedule_location", JSONObject().apply {
+                        put("type", "string")
+                        put("description", LlmPrompts.paramDescription("schedule_location"))
+                    })
+                    put("schedule_on_enter", JSONObject().apply {
                         put("type", "boolean")
-                        put("description", LlmPrompts.paramDescription("completed"))
+                        put("description", LlmPrompts.paramDescription("schedule_on_enter"))
+                    })
+                    put("suggested_routine_name", JSONObject().apply {
+                        put("type", "string")
+                        put("description", LlmPrompts.paramDescription("suggested_routine_name"))
+                    })
+                    put("suggested_routine_icon", JSONObject().apply {
+                        put("type", "string")
+                        put("description", LlmPrompts.paramDescription("suggested_routine_icon"))
                     })
                 })
                 put("required", JSONArray().apply {
                     put("thought")
                     put("action_type")
-                    put("completed")
                 })
             })
             })

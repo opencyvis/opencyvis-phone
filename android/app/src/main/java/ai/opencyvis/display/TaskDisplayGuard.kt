@@ -47,9 +47,9 @@ class TaskDisplayGuard(
 ) {
     companion object {
         private const val TAG = "TaskDisplayGuard"
-        private const val FALLBACK_SCAN_MS = 2500L
+        private const val FALLBACK_SCAN_MS = 800L
         private const val PENDING_LAUNCH_MS = 3000L
-        private const val RESCUE_COOLDOWN_MS = 5000L
+        private const val RESCUE_COOLDOWN_MS = 2000L
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -133,6 +133,14 @@ class TaskDisplayGuard(
         Log.i(TAG, "Tracking controlled task: $task")
     }
 
+    fun addControlledTaskId(taskId: Int) {
+        if (taskId <= 0) return
+        synchronized(lock) {
+            controlledTaskIds.add(taskId)
+        }
+        Log.i(TAG, "Tracking controlled task id: $taskId")
+    }
+
     fun addControlledTasks(tasks: Collection<TaskSnapshot>) {
         tasks.forEach { addControlledTask(it) }
     }
@@ -214,10 +222,19 @@ class TaskDisplayGuard(
     private fun scanForEscapedTasks() {
         val taskIds = controlledTaskIdsSnapshot()
         if (taskIds.isEmpty()) return
-        val packages = controlledPackagesSnapshot()
-        vdm.getRunningTasks(limit = 100)
-            .firstOrNull { TaskDisplayGuardPolicy.shouldRescue(it, taskIds, packages) }
-            ?.let { maybeDispatchEscape(it) }
+        // Use backend (shell process) to query Display 0 top task — app process cannot
+        // call ActivityTaskManager.getService() due to hidden API restrictions.
+        val topTaskOnD0 = vdm.getTopTaskIdOnDisplay(Display.DEFAULT_DISPLAY) ?: return
+        if (topTaskOnD0 in taskIds) {
+            val snapshot = TaskSnapshot(
+                taskId = topTaskOnD0,
+                displayId = Display.DEFAULT_DISPLAY,
+                topPackage = null,
+                basePackage = null,
+                lastActiveTime = 0
+            )
+            maybeDispatchEscape(snapshot)
+        }
     }
 
     /**
@@ -253,7 +270,7 @@ class TaskDisplayGuard(
             return
         }
 
-        // Path 3: genuine escape — cooldown then dispatch
+        // Path 3: controlled task escaped — silent reparent back to VD immediately
         val now = SystemClock.elapsedRealtime()
         val lastRescue = synchronized(lock) { recentRescues[task.taskId] ?: 0 }
         if (now - lastRescue < RESCUE_COOLDOWN_MS) {
@@ -262,13 +279,14 @@ class TaskDisplayGuard(
         }
 
         synchronized(lock) { recentRescues[task.taskId] = now }
+        Log.i(TAG, "Silent reparent (escape rescue): ${task.topPackage} task=${task.taskId} → VD ${vdm.displayId}")
+        vdm.moveTaskToDisplay(task.taskId, vdm.displayId)
+        addControlledTask(task.copy(displayId = vdm.displayId))
+
         dispatchingEscape = true
         mainHandler.post {
             try {
-                if (running) {
-                    Log.w(TAG, "Controlled task escaped to Display 0: $task")
-                    onEscape(task)
-                }
+                if (running) onEscape(task)
             } finally {
                 dispatchingEscape = false
             }
@@ -280,10 +298,10 @@ class TaskDisplayGuard(
     }
 
     private fun isLauncherTopOnDefaultDisplay(): Boolean {
-        val launcherPackage = homePackage() ?: return false
-        val topTask = vdm.getRunningTasks(limit = 10)
-            .firstOrNull { it.displayId == Display.DEFAULT_DISPLAY }
-        return topTask?.containsPackage(launcherPackage) == true
+        // Cannot reliably query from app process (ActivityTaskManager hidden API blocked).
+        // During agent execution, controlled tasks shouldn't be on Display 0 at all,
+        // so skip this check — rescue is always appropriate.
+        return false
     }
 
     private fun homePackage(): String? {

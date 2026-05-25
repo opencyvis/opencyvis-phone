@@ -20,5 +20,7 @@ data class ChatMessageEntity(
     val conversationId: Long,
     val type: String,
     val text: String,
-    val timestamp: Long
+    val timestamp: Long,
+    val source: String = "local",
+    val remoteChatId: String? = null
 )
