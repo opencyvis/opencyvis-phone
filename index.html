@@ -37,7 +37,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Noise texture overlay */
 body::before {
   content: '';
   position: fixed;
@@ -178,14 +177,38 @@ nav {
 
 .hero-name b { color: var(--accent); }
 
+/* HERO DEMO */
+.hero-demo {
+  margin-top: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  opacity: 0;
+  animation: fadeUp 1s ease 0.6s forwards;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-demo img {
+  width: 260px;
+  border-radius: 16px;
+  border: 2px solid var(--border);
+}
+
+.hero-demo-caption {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
 /* VIRTUAL DISPLAY VISUAL */
 .vd-visual {
-  margin-top: 64px;
+  margin-top: 48px;
   display: flex;
   gap: 24px;
   align-items: center;
-  opacity: 0;
-  animation: fadeUp 1s ease 0.6s forwards;
   position: relative;
   z-index: 1;
 }
@@ -205,9 +228,7 @@ nav {
   padding: 16px;
 }
 
-.vd-screen.yours {
-  border-color: #2a2c32;
-}
+.vd-screen.yours { border-color: #2a2c32; }
 
 .vd-screen.ai {
   border-color: var(--accent-dim);
@@ -245,13 +266,7 @@ nav {
   width: 100%;
 }
 
-.vd-line {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--border);
-  width: 100%;
-}
-
+.vd-line { height: 6px; border-radius: 3px; background: var(--border); width: 100%; }
 .vd-line.short { width: 60%; }
 .vd-line.med { width: 80%; }
 
@@ -259,15 +274,11 @@ nav {
   background: rgba(212, 160, 57, 0.12);
   animation: pulse 2s ease-in-out infinite;
 }
-
 .vd-screen.ai .vd-line:nth-child(2) { animation-delay: 0.3s; }
 .vd-screen.ai .vd-line:nth-child(3) { animation-delay: 0.6s; }
 .vd-screen.ai .vd-line:nth-child(4) { animation-delay: 0.9s; }
 
-.vd-arrow {
-  font-size: 20px;
-  color: var(--border);
-}
+.vd-arrow { font-size: 20px; color: var(--border); }
 
 /* ANNOUNCEMENT */
 .announce {
@@ -427,18 +438,9 @@ section p.lead {
   font-weight: 500;
 }
 
-.compare-table th:last-child {
-  color: var(--accent);
-}
-
-.compare-table td:last-child {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.compare-table tr:hover td {
-  background: rgba(212, 160, 57, 0.02);
-}
+.compare-table th:last-child { color: var(--accent); }
+.compare-table td:last-child { color: var(--accent); font-weight: 600; }
+.compare-table tr:hover td { background: rgba(212, 160, 57, 0.02); }
 
 /* FEATURES */
 .features-grid {
@@ -469,10 +471,8 @@ section p.lead {
   line-height: 1.7;
 }
 
-/* TECHNOLOGY */
-.tech-section {
-  border-top: 1px solid var(--border);
-}
+/* TECHNOLOGY / TRUST */
+.tech-section { border-top: 1px solid var(--border); }
 
 .tech-grid {
   display: grid;
@@ -491,9 +491,7 @@ section p.lead {
   transition: border-color 0.3s;
 }
 
-.tech-card:hover {
-  border-color: #2a2c32;
-}
+.tech-card:hover { border-color: #2a2c32; }
 
 .tech-card.featured {
   grid-column: 1 / -1;
@@ -563,10 +561,7 @@ section p.lead {
   color: var(--cyan);
 }
 
-.tech-channel p {
-  font-size: 11px;
-  line-height: 1.5;
-}
+.tech-channel p { font-size: 11px; line-height: 1.5; }
 
 .tech-philosophy {
   margin-top: 40px;
@@ -591,47 +586,69 @@ section p.lead {
   .tech-channels { grid-template-columns: 1fr; }
 }
 
-/* MODELS */
-.models-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+/* ARCHITECTURE */
+.arch-section { border-top: 1px solid var(--border); }
+
+.arch-table {
   margin-top: 40px;
+  overflow-x: auto;
 }
 
-.model-card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  padding: 28px 24px;
-  border-radius: 8px;
-  transition: border-color 0.2s;
-}
-
-.model-card:hover {
-  border-color: #2a2c32;
-}
-
-.model-card h3 {
-  font-family: var(--font-mono);
+.arch-table table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 8px;
 }
 
-.model-card .examples {
-  font-size: 12px;
-  color: var(--accent-dim);
+.arch-table th,
+.arch-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.arch-table th {
   font-family: var(--font-mono);
-  margin-bottom: 10px;
-}
-
-.model-card p {
-  font-size: 13px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--muted);
-  line-height: 1.6;
+  font-weight: 600;
 }
 
-/* BENCHMARK TABLE */
+.arch-table td { color: var(--muted); }
+.arch-table td:first-child {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.arch-table .hl { color: var(--cyan); }
+
+.arch-diagram {
+  margin-top: 32px;
+  text-align: center;
+}
+
+.arch-diagram img {
+  max-width: 500px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.arch-note {
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* MODELS / BENCHMARK TABLE */
+.bench-section { border-top: 1px solid var(--border); }
+
 .bench-table {
   margin-top: 40px;
   overflow-x: auto;
@@ -670,14 +687,23 @@ section p.lead {
 
 .bench-table .pass { color: var(--cyan); }
 
-.bench-table .recommend {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 16px;
-  font-style: italic;
+.bench-table . subgroup-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding-top: 20px;
 }
 
-.bench-table .recommend b { color: var(--accent); font-style: normal; }
+.bench-recommend {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 20px;
+  line-height: 1.8;
+}
+
+.bench-recommend b { color: var(--accent); font-weight: 600; }
 
 /* PRIVACY */
 .privacy-section {
@@ -719,7 +745,7 @@ section p.lead {
 }
 
 .privacy-points li::before {
-  content: '→';
+  content: '\2192';
   position: absolute;
   left: 0;
   color: var(--accent);
@@ -758,6 +784,35 @@ section p.lead {
   line-height: 1.9;
 }
 
+.start-path .apk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+.start-path .apk-table th,
+.start-path .apk-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.start-path .apk-table th {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.start-path .apk-table td:first-child {
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
 .start-code {
   font-family: var(--font-mono);
   font-size: 13px;
@@ -774,6 +829,67 @@ section p.lead {
 .start-code .cmd { color: var(--text); }
 .start-code .comment { color: #555; }
 
+/* ROADMAP */
+.roadmap-section { border-top: 1px solid var(--border); }
+
+.roadmap-list {
+  margin-top: 32px;
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.roadmap-list li {
+  font-size: 15px;
+  color: var(--muted);
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  line-height: 1.6;
+}
+
+.roadmap-list li::before {
+  content: '\2192';
+  margin-right: 10px;
+  color: var(--accent);
+}
+
+/* ACKNOWLEDGMENTS */
+.ack-section {}
+
+.ack-list {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ack-item {
+  padding: 14px 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+}
+
+.ack-item a {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.ack-item a:hover { color: var(--accent); }
+
+.ack-item p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
 /* FOOTER */
 footer {
   border-top: 1px solid var(--border);
@@ -785,15 +901,9 @@ footer {
   margin: 0 auto;
 }
 
-footer .copy {
-  font-size: 12px;
-  color: var(--muted);
-}
+footer .copy { font-size: 12px; color: var(--muted); }
 
-footer .links {
-  display: flex;
-  gap: 24px;
-}
+footer .links { display: flex; gap: 24px; }
 
 footer .links a {
   font-size: 12px;
@@ -843,7 +953,6 @@ footer .links a:hover { color: var(--text); }
   .announce { padding: 0 20px 60px; }
   .announce-panel { grid-template-columns: 1fr; padding: 28px; }
   .start-paths { grid-template-columns: 1fr; }
-  .models-grid { grid-template-columns: 1fr; }
   .privacy-points { grid-template-columns: 1fr; }
   .vd-visual { flex-direction: column; gap: 16px; }
   .vd-screen { width: 140px; height: 240px; }
@@ -879,27 +988,9 @@ footer .links a:hover { color: var(--text); }
   <p class="hero-sub">Commercial AI phones are black boxes. This one isn't. See every line of code, pick your model, control your data.</p>
   <p class="hero-name"><b>Open</b> <b>Cy</b>ber Jar<b>vis</b></p>
 
-  <div class="vd-visual">
-    <div class="vd-screen yours">
-      <div class="vd-content">
-        <div class="vd-line"></div>
-        <div class="vd-line med"></div>
-        <div class="vd-line short"></div>
-        <div class="vd-line"></div>
-        <div class="vd-line med"></div>
-      </div>
-      <div class="vd-label">Your screen</div>
-    </div>
-    <div class="vd-arrow">⟷</div>
-    <div class="vd-screen ai">
-      <div class="vd-content">
-        <div class="vd-line"></div>
-        <div class="vd-line short"></div>
-        <div class="vd-line med"></div>
-        <div class="vd-line"></div>
-      </div>
-      <div class="vd-label">AI works here</div>
-    </div>
+  <div class="hero-demo">
+    <img src="docs/demos/home_screen.png" alt="OpenCyvis v2 home screen">
+    <div class="hero-demo-caption">OpenCyvis v2 home screen</div>
   </div>
 </section>
 
@@ -907,14 +998,16 @@ footer .links a:hover { color: var(--text); }
 <div class="announce reveal">
   <div class="announce-panel">
     <div>
-      <div class="section-label">v2.0 Preview</div>
-      <h2>v2.0 is coming — and it works on any phone.</h2>
-      <p>No custom ROM required. Install the app, follow the setup guide, and let OpenCyvis work from your everyday Android phone. You can send tasks from messaging apps, receive results and screenshots in chat, and use a redesigned interface built for daily use.</p>
-      <div class="announce-note">v2.0 will be open source soon.</div>
+      <div class="section-label">v2.0 Released</div>
+      <h2>v2.0 is here — and it works on any phone.</h2>
+      <p>No custom ROM required for standard mode. Install the app, follow the setup wizard for ADB wireless pairing, choose your LLM backend, and start using. You can send tasks from messaging apps, receive results and screenshots in chat, and use a redesigned interface built for daily use.</p>
+      <div class="announce-note">Fully open source. Apache 2.0.</div>
     </div>
     <div class="announce-list">
-      <span>Install and go</span>
-      <span>Remote control from chat</span>
+      <span>Install and go — no root, no computer</span>
+      <span>Remote control from Feishu / Telegram</span>
+      <span>Routines — schedule recurring tasks</span>
+      <span>Provider Profiles — one-tap model switch</span>
       <span>Redesigned light and dark UI</span>
     </div>
   </div>
@@ -924,7 +1017,7 @@ footer .links a:hover { color: var(--text); }
 <section class="reveal">
   <div class="section-label">Why</div>
   <h2>You should at least have the choice.</h2>
-  <p class="lead">When a company ships an "AI phone," they get full access to your screen, apps, messages, banking — and you can't see the model, can't verify what leaves your device, can't choose an alternative.</p>
+  <p class="lead">When a company ships an "AI phone," they get full access to your screen, apps, messages — and you can't see what model is running, can't verify what data leaves your device, can't choose an alternative.</p>
 
   <div class="why-grid">
     <div class="why-point">
@@ -1018,43 +1111,66 @@ footer .links a:hover { color: var(--text); }
 <section id="features" class="reveal">
   <div class="section-label">Features</div>
   <h2>What it does</h2>
-  <p class="lead">Give it a task in natural language. It sees your screen, understands the UI, and operates apps just like you would — now with an app experience designed for ordinary phones.</p>
+  <p class="lead">Give it a task in natural language — it sees your screen, understands the UI, and operates apps just like you would.</p>
+
+  <div class="vd-visual" style="margin-bottom: 48px;">
+    <div class="vd-screen yours">
+      <div class="vd-content">
+        <div class="vd-line"></div>
+        <div class="vd-line med"></div>
+        <div class="vd-line short"></div>
+        <div class="vd-line"></div>
+        <div class="vd-line med"></div>
+      </div>
+      <div class="vd-label">Your screen</div>
+    </div>
+    <div class="vd-arrow">⟷</div>
+    <div class="vd-screen ai">
+      <div class="vd-content">
+        <div class="vd-line"></div>
+        <div class="vd-line short"></div>
+        <div class="vd-line med"></div>
+        <div class="vd-line"></div>
+      </div>
+      <div class="vd-label">AI works here</div>
+    </div>
+  </div>
 
   <div class="features-grid">
+    <div class="feature-card">
+      <h3>Background Operation</h3>
+      <p>AI works on a virtual display — your phone stays free. Book flights while you scroll Twitter.</p>
+    </div>
     <div class="feature-card">
       <h3>Works on any Android phone</h3>
       <p>No custom ROM, no computer needed. Install the app and follow the setup guide.</p>
     </div>
     <div class="feature-card">
-      <h3>Remote control via chat</h3>
-      <p>Send tasks from Telegram or Feishu. Get results and screenshots right in your chat.</p>
+      <h3>Remote Control via IM</h3>
+      <p>Send tasks from Feishu or Telegram. Get results and screenshots right in chat.</p>
     </div>
     <div class="feature-card">
       <h3>Routines</h3>
-      <p>Save your frequent tasks. One tap to run them again.</p>
+      <p>Save frequent operations and run them on a schedule or with one tap. Supports geofencing too.</p>
     </div>
     <div class="feature-card">
-      <h3>Dark mode</h3>
-      <p>Full day/night theme for the app and control surface.</p>
+      <h3>Provider Profiles</h3>
+      <p>Save multiple AI configs and switch with one tap. No re-entering URLs and keys.</p>
     </div>
     <div class="feature-card">
-      <h3>Works with multiple ROMs</h3>
-      <p>Adapted for MIUI, ColorOS, OriginOS, and other Android variants.</p>
+      <h3>Dark Mode</h3>
+      <p>Full day/night theme. Follows system settings or set manually.</p>
     </div>
     <div class="feature-card">
-      <h3>Background Operation</h3>
-      <p>AI works in its own space. Your phone stays free.</p>
+      <h3>Multi-ROM Support</h3>
+      <p>Standard mode supports MIUI, ColorOS, OriginOS, and other vendor ROMs.</p>
     </div>
     <div class="feature-card">
       <h3>Any AI Model</h3>
-      <p>Use the model or service you prefer, including local options.</p>
+      <p>Cloud, private, or local — use the model or service you prefer.</p>
     </div>
     <div class="feature-card">
-      <h3>Understands screens</h3>
-      <p>Reads what is visible and acts on the right controls.</p>
-    </div>
-    <div class="feature-card">
-      <h3>Watch & Takeover</h3>
+      <h3>Watch &amp; Takeover</h3>
       <p>Observe in real-time. Take control anytime. Hand back seamlessly.</p>
     </div>
     <div class="feature-card">
@@ -1063,7 +1179,7 @@ footer .links a:hover { color: var(--text); }
     </div>
     <div class="feature-card">
       <h3>Offline Voice</h3>
-      <p>On-device speech recognition. No internet needed.</p>
+      <p>On-device speech recognition via Sherpa-ONNX. No internet needed.</p>
     </div>
   </div>
 </section>
@@ -1100,7 +1216,7 @@ footer .links a:hover { color: var(--text); }
     <div class="tech-card">
       <div class="tech-num">02 — Choice</div>
       <h3>Use the model you trust</h3>
-      <p>Connect a cloud model, a private service, or a local model. OpenCyvis is not tied to one AI vendor.</p>
+      <p>Connect a cloud model, a private service, or a local model via Ollama. OpenCyvis is not tied to one AI vendor.</p>
     </div>
 
     <div class="tech-card">
@@ -1118,7 +1234,7 @@ footer .links a:hover { color: var(--text); }
     <div class="tech-card">
       <div class="tech-num">05 — Openness</div>
       <h3>Open source is the product promise</h3>
-      <p>The v2.0 code will be published so users, builders, and researchers can inspect how the app behaves.</p>
+      <p>All code is public under Apache 2.0. Users, builders, and researchers can inspect how the app behaves.</p>
     </div>
 
   </div>
@@ -1128,45 +1244,81 @@ footer .links a:hover { color: var(--text); }
   </div>
 </section>
 
-<!-- MODELS -->
-<section id="models" class="reveal">
+<!-- ARCHITECTURE -->
+<section id="arch" class="arch-section reveal">
+  <div class="section-label">Architecture</div>
+  <h2>Dual backend, one experience</h2>
+  <p class="lead">Both install modes share all upper-layer code. The difference is only in the privilege layer, isolated behind a <code style="font-family:var(--font-mono);font-size:13px;background:var(--bg-elevated);border:1px solid var(--border);padding:2px 6px;border-radius:3px;color:var(--cyan);">PrivilegeBackend</code> interface.</p>
+
+  <div class="arch-table">
+    <table>
+      <thead>
+        <tr><th></th><th>SystemBackend</th><th>RemoteBackend</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Privilege source</td><td>Platform signing (uid system)</td><td>ADB shell (uid 2000)</td></tr>
+        <tr><td>Input injection</td><td>InputManager reflection</td><td>AIDL proxy to PrivilegedService</td></tr>
+        <tr><td>Screenshot</td><td><span class="hl">SurfaceControl.screenshot()</span></td><td>ImageReader from VD Surface</td></tr>
+        <tr><td>VD task management</td><td>ActivityTaskManager reflection</td><td>PrivilegedService proxy</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="arch-diagram">
+    <img src="docs/demos/backend_architecture.png" alt="Dual backend architecture">
+  </div>
+  <div class="arch-note">The backend is selected automatically at runtime.</div>
+</section>
+
+<!-- MODELS / BENCHMARKS -->
+<section id="models" class="bench-section reveal">
   <div class="section-label">Models</div>
   <h2>Model-agnostic</h2>
   <p class="lead">Bring your own AI account, connect a private server, or run locally when privacy matters most.</p>
 
-  <div class="models-grid">
-    <div class="model-card">
-      <h3>Cloud models</h3>
-      <div class="examples">Fast and capable</div>
-      <p>Use a hosted model when you want the best quality and speed.</p>
-    </div>
-    <div class="model-card">
-      <h3>Private services</h3>
-      <div class="examples">Team or personal server</div>
-      <p>Route requests through infrastructure you control.</p>
-    </div>
-    <div class="model-card">
-      <h3>Local models</h3>
-      <div class="examples">Maximum control</div>
-      <p>Run tasks without sending phone context to a third-party service.</p>
-    </div>
+  <div class="bench-table">
+    <table>
+      <thead>
+        <tr><th colspan="4" style="color:var(--accent);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">Cloud Models</th></tr>
+        <tr><th>Model</th><th>Latency per step</th><th>Pass Rate</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Qwen 3.5 Plus</b></td><td>4-6s</td><td class="pass">4/4</td><td>Stable, recommended</td></tr>
+        <tr><td><b>Claude Opus 4</b></td><td>4-8s</td><td class="pass">4/4</td><td>Highest reasoning quality</td></tr>
+        <tr><td><b>MiMo v2.5</b></td><td>2.3-4.5s</td><td class="pass">4/4</td><td>Fastest</td></tr>
+        <tr><td><b>GPT-4o</b></td><td>3-6s</td><td>3/4</td><td>Occasionally ignores tool_choice</td></tr>
+      </tbody>
+    </table>
+
+    <table style="margin-top: 32px;">
+      <thead>
+        <tr><th colspan="4" style="color:var(--accent);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">Local Models (via Ollama)</th></tr>
+        <tr><th>Model</th><th>Size</th><th>Speed</th><th>Pass Rate</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Gemma 4 26B-A4B</b> Q4</td><td>17 GB</td><td>63 tok/s</td><td class="pass">4/4</td></tr>
+        <tr><td><b>Gemma 4 E2B</b> Q4</td><td>1.8 GB</td><td>41 tok/s</td><td class="pass">4/4</td></tr>
+        <tr><td><b>Qwen 3.5 35B-A3B</b> Q4</td><td>22 GB</td><td>47 tok/s</td><td>3/4</td></tr>
+        <tr><td><b>Gemma 4 E4B</b> Q4</td><td>3 GB</td><td>61 tok/s</td><td>3/4</td></tr>
+      </tbody>
+    </table>
   </div>
+
+  <p class="bench-recommend"><b>Recommended:</b> Gemma 4 26B-A4B — best balance of speed, quality, and memory.<br><b>Minimal:</b> Gemma 4 E2B — just 1.8 GB, still passes all 4 tests.</p>
 </section>
 
 <!-- PRIVACY -->
 <section class="privacy-section full reveal">
   <div style="max-width: 1000px; margin: 0 auto; padding: 120px 40px;">
-    <div class="section-label">Privacy & Security</div>
+    <div class="section-label">Privacy &amp; Security</div>
     <h2>Not a place for "trust us."</h2>
     <p class="lead">An AI agent with full phone access is one of the most privileged pieces of software you can run.</p>
 
     <ul class="privacy-points">
-      <li>Task context is handled only for the work you ask OpenCyvis to do</li>
       <li>You choose the AI service — hosted, private, or local</li>
       <li>No telemetry, no analytics, no phone-home — zero tracking code</li>
-      <li>Local model option for maximum privacy</li>
-      <li>Open source — security researchers, journalists, anyone can audit</li>
-      <li>100% of code is public. Always.</li>
+      <li>Open source — anyone can audit</li>
+      <li>Local model option — nothing leaves your device</li>
     </ul>
 
     <div class="privacy-flow">Your task ──→ OpenCyvis (<span class="hl">on your phone</span>) ──→ Your chosen AI ──→ Result
@@ -1178,37 +1330,102 @@ footer .links a:hover { color: var(--text); }
 <!-- GETTING STARTED -->
 <section id="start" class="reveal">
   <div class="section-label">Getting Started</div>
-  <h2>Two ways to try it</h2>
-  <p class="lead">v2.0 is being prepared for a simple app-based setup. v1.0 remains available today for developers who want to build from source.</p>
+  <h2>Two ways to install</h2>
+  <p class="lead">Choose Standard Mode for everyday use, or System App Mode for maximum performance with AOSP.</p>
 
   <div class="start-paths">
     <div class="start-path highlight">
-      <h3>v2.0 — coming soon</h3>
+      <h3>Standard Mode (Recommended)</h3>
       <ol>
-        <li>Install the app</li>
-        <li>Follow the setup wizard</li>
+        <li>Download <code style="font-family:var(--font-mono);font-size:12px;background:var(--bg);border:1px solid var(--border);padding:1px 5px;border-radius:3px;color:var(--cyan);">opencyvis-standard-release.apk</code> and install</li>
+        <li>Open the app, follow the setup wizard for wireless pairing</li>
+        <li>Configure your LLM provider in Settings</li>
         <li>Start sending tasks</li>
       </ol>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted);">No root, no computer, no custom ROM. Android 11+.</p>
     </div>
     <div class="start-path">
-      <h3>v1.0 — available now</h3>
+      <h3>System App Mode</h3>
       <ol>
         <li>Clone the repository</li>
-        <li>Build from source</li>
-        <li>Follow the developer setup guide</li>
+        <li>Build system APK from source</li>
+        <li>Flash into AOSP as system app</li>
       </ol>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted);">For developers building custom AOSP images.</p>
     </div>
   </div>
 
-  <pre class="start-code"><span class="comment"># v1.0 developer build</span>
+  <table class="start-path" style="margin-top:24px;width:100%;border:1px solid var(--border);border-radius:8px;border-spacing:0;overflow:hidden;">
+    <thead>
+      <tr style="background:var(--bg-elevated);">
+        <th style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:12px 14px;text-align:left;">APK</th>
+        <th style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:12px 14px;text-align:left;">For</th>
+        <th style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:12px 14px;text-align:left;">Package ID</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="font-family:var(--font-mono);font-size:12px;padding:12px 14px;color:var(--text);">opencyvis-standard-release.apk</td>
+        <td style="font-size:13px;padding:12px 14px;color:var(--muted);">Most users — any Android 11+ phone</td>
+        <td style="font-family:var(--font-mono);font-size:12px;padding:12px 14px;color:var(--muted);">ai.opencyvis.standard</td>
+      </tr>
+      <tr>
+        <td style="font-family:var(--font-mono);font-size:12px;padding:12px 14px;color:var(--text);">opencyvis-system-release.apk</td>
+        <td style="font-size:13px;padding:12px 14px;color:var(--muted);">Developers — flash into AOSP</td>
+        <td style="font-family:var(--font-mono);font-size:12px;padding:12px 14px;color:var(--muted);">ai.opencyvis</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <pre class="start-code"><span class="comment"># System App Mode build</span>
 <span class="cmd">git clone https://github.com/opencyvis/opencyvis-phone.git</span>
 <span class="cmd">cd opencyvis-phone/android</span>
-<span class="cmd">./gradlew assembleRelease</span></pre>
+<span class="cmd">./gradlew assembleSystemRelease</span></pre>
+
+  <pre class="start-code" style="margin-top:16px;"><span class="comment"># Configure LLM via deeplink</span>
+<span class="comment"># Local Ollama (fully private)</span>
+<span class="cmd">adb shell am start -a android.intent.action.VIEW \</span>
+<span class="cmd">  -d "opencyvis://config?provider=ollama&amp;base_url=http://localhost:11434&amp;model=gemma4:26b"</span>
+
+<span class="comment"># Cloud API</span>
+<span class="cmd">adb shell am start -a android.intent.action.VIEW \</span>
+<span class="cmd">  -d "opencyvis://config?provider=openai&amp;base_url=https://api.example.com/v1&amp;api_key=YOUR_KEY&amp;model=qwen-vl-max"</span></pre>
+
+  <p style="margin-top:16px;font-size:13px;color:var(--muted);">Download APKs from the <a href="https://github.com/opencyvis/opencyvis-phone/releases" style="color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-dim);">Releases page</a>.</p>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap" class="roadmap-section reveal">
+  <div class="section-label">Roadmap</div>
+  <h2>What's next</h2>
+
+  <ul class="roadmap-list">
+    <li>Explore more convenient privilege acquisition methods</li>
+    <li>Further optimize local model support</li>
+    <li>Cross-device coordination (phone + desktop)</li>
+  </ul>
+</section>
+
+<!-- ACKNOWLEDGMENTS -->
+<section class="ack-section reveal">
+  <div class="section-label">Acknowledgments</div>
+  <h2>Built on great work</h2>
+
+  <div class="ack-list">
+    <div class="ack-item">
+      <a href="https://github.com/k2-fsa/sherpa-onnx">Sherpa-ONNX</a>
+      <p>On-device speech recognition (Apache 2.0)</p>
+    </div>
+    <div class="ack-item">
+      <a href="https://github.com/RikkaApps/Shizuku">Shizuku</a>
+      <p>ADB privilege access for standard mode (Apache 2.0)</p>
+    </div>
+  </div>
 </section>
 
 <!-- FOOTER -->
 <footer>
-  <div class="copy">© 2026 OpenCyvis Contributors · Apache 2.0</div>
+  <div class="copy">&copy; 2026 OpenCyvis Contributors &middot; Apache 2.0</div>
   <div class="links">
     <a href="https://github.com/opencyvis/opencyvis-phone">GitHub</a>
     <a href="story.html">Story</a>

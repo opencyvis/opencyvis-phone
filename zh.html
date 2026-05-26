@@ -37,7 +37,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Noise texture overlay */
 body::before {
   content: '';
   position: fixed;
@@ -178,14 +177,38 @@ nav {
 
 .hero-name b { color: var(--accent); }
 
+/* HERO DEMO */
+.hero-demo {
+  margin-top: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  opacity: 0;
+  animation: fadeUp 1s ease 0.6s forwards;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-demo img {
+  width: 260px;
+  border-radius: 16px;
+  border: 2px solid var(--border);
+}
+
+.hero-demo-caption {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
 /* VIRTUAL DISPLAY VISUAL */
 .vd-visual {
-  margin-top: 64px;
+  margin-top: 48px;
   display: flex;
   gap: 24px;
   align-items: center;
-  opacity: 0;
-  animation: fadeUp 1s ease 0.6s forwards;
   position: relative;
   z-index: 1;
 }
@@ -205,9 +228,7 @@ nav {
   padding: 16px;
 }
 
-.vd-screen.yours {
-  border-color: #2a2c32;
-}
+.vd-screen.yours { border-color: #2a2c32; }
 
 .vd-screen.ai {
   border-color: var(--accent-dim);
@@ -238,20 +259,9 @@ nav {
 
 .vd-screen.ai .vd-label { color: var(--accent); }
 
-.vd-content {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
+.vd-content { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 
-.vd-line {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--border);
-  width: 100%;
-}
-
+.vd-line { height: 6px; border-radius: 3px; background: var(--border); width: 100%; }
 .vd-line.short { width: 60%; }
 .vd-line.med { width: 80%; }
 
@@ -259,15 +269,11 @@ nav {
   background: rgba(212, 160, 57, 0.12);
   animation: pulse 2s ease-in-out infinite;
 }
-
 .vd-screen.ai .vd-line:nth-child(2) { animation-delay: 0.3s; }
 .vd-screen.ai .vd-line:nth-child(3) { animation-delay: 0.6s; }
 .vd-screen.ai .vd-line:nth-child(4) { animation-delay: 0.9s; }
 
-.vd-arrow {
-  font-size: 20px;
-  color: var(--border);
-}
+.vd-arrow { font-size: 20px; color: var(--border); }
 
 /* ANNOUNCEMENT */
 .announce {
@@ -290,16 +296,8 @@ nav {
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
 }
 
-.announce h2 {
-  font-size: clamp(24px, 3vw, 34px);
-  margin-bottom: 14px;
-}
-
-.announce p {
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.8;
-}
+.announce h2 { font-size: clamp(24px, 3vw, 34px); margin-bottom: 14px; }
+.announce p { color: var(--muted); font-size: 15px; line-height: 1.8; }
 
 .announce-note {
   margin-top: 18px;
@@ -310,10 +308,7 @@ nav {
   text-transform: uppercase;
 }
 
-.announce-list {
-  display: grid;
-  gap: 10px;
-}
+.announce-list { display: grid; gap: 10px; }
 
 .announce-list span {
   display: block;
@@ -327,17 +322,8 @@ nav {
 }
 
 /* SECTION STYLES */
-section {
-  padding: 120px 40px;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-section.full {
-  max-width: none;
-  padding-left: 0;
-  padding-right: 0;
-}
+section { padding: 120px 40px; max-width: 1000px; margin: 0 auto; }
+section.full { max-width: none; padding-left: 0; padding-right: 0; }
 
 .section-label {
   font-family: var(--font-mono);
@@ -357,88 +343,23 @@ section h2 {
   line-height: 1.2;
 }
 
-section p.lead {
-  font-size: 17px;
-  color: var(--muted);
-  line-height: 1.8;
-  max-width: 600px;
-}
+section p.lead { font-size: 17px; color: var(--muted); line-height: 1.8; max-width: 600px; }
 
-/* WHY SECTION */
-.why-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  margin-top: 48px;
-}
-
-.why-point h3 {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--text);
-}
-
-.why-point p {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.7;
-}
+/* WHY */
+.why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 48px; }
+.why-point h3 { font-family: var(--font-mono); font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+.why-point p { font-size: 14px; color: var(--muted); line-height: 1.7; }
 
 /* COMPARISON */
-.compare-section {
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  padding: 80px 40px;
-}
-
-.compare-table {
-  max-width: 900px;
-  margin: 0 auto;
-  overflow-x: auto;
-}
-
-.compare-table table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.compare-table th,
-.compare-table td {
-  padding: 14px 16px;
-  text-align: center;
-  border-bottom: 1px solid var(--border);
-}
-
-.compare-table th {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.compare-table th:first-child,
-.compare-table td:first-child {
-  text-align: left;
-  font-weight: 500;
-}
-
-.compare-table th:last-child {
-  color: var(--accent);
-}
-
-.compare-table td:last-child {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.compare-table tr:hover td {
-  background: rgba(212, 160, 57, 0.02);
-}
+.compare-section { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 80px 40px; }
+.compare-table { max-width: 900px; margin: 0 auto; overflow-x: auto; }
+.compare-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.compare-table th, .compare-table td { padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border); }
+.compare-table th { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.compare-table th:first-child, .compare-table td:first-child { text-align: left; font-weight: 500; }
+.compare-table th:last-child { color: var(--accent); }
+.compare-table td:last-child { color: var(--accent); font-weight: 600; }
+.compare-table tr:hover td { background: rgba(212, 160, 57, 0.02); }
 
 /* FEATURES */
 .features-grid {
@@ -449,140 +370,28 @@ section p.lead {
   border: 1px solid var(--border);
   margin-top: 48px;
 }
+.feature-card { background: var(--bg); padding: 36px 28px; }
+.feature-card h3 { font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; margin-bottom: 10px; }
+.feature-card p { font-size: 13px; color: var(--muted); line-height: 1.7; }
 
-.feature-card {
-  background: var(--bg);
-  padding: 36px 28px;
-}
-
-.feature-card h3 {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  margin-bottom: 10px;
-}
-
-.feature-card p {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.7;
-}
-
-/* TECHNOLOGY */
-.tech-section {
-  border-top: 1px solid var(--border);
-}
-
-.tech-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-  margin-top: 48px;
-}
-
-.tech-card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 32px 28px;
-  position: relative;
-  overflow: hidden;
-  transition: border-color 0.3s;
-}
-
-.tech-card:hover {
-  border-color: #2a2c32;
-}
-
-.tech-card.featured {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-  align-items: center;
-}
-
-.tech-card .tech-num {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--accent-dim);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-
-.tech-card h3 {
-  font-family: var(--font-mono);
-  font-size: 15px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  line-height: 1.3;
-}
-
-.tech-card p {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.75;
-}
-
-.tech-card .tech-detail {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 16px;
-  padding: 14px 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  line-height: 1.7;
-}
-
+/* TECHNOLOGY / TRUST */
+.tech-section { border-top: 1px solid var(--border); }
+.tech-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 48px; }
+.tech-card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; padding: 32px 28px; position: relative; overflow: hidden; transition: border-color 0.3s; }
+.tech-card:hover { border-color: #2a2c32; }
+.tech-card.featured { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
+.tech-card .tech-num { font-family: var(--font-mono); font-size: 10px; color: var(--accent-dim); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
+.tech-card h3 { font-family: var(--font-mono); font-size: 15px; font-weight: 700; margin-bottom: 12px; line-height: 1.3; }
+.tech-card p { font-size: 13px; color: var(--muted); line-height: 1.75; }
+.tech-card .tech-detail { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 16px; padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; line-height: 1.7; }
 .tech-card .tech-detail .hl { color: var(--cyan); }
 .tech-card .tech-detail .accent { color: var(--accent); }
-
-.tech-channels {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.tech-channel {
-  padding: 12px 14px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-.tech-channel h4 {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: var(--cyan);
-}
-
-.tech-channel p {
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.tech-philosophy {
-  margin-top: 40px;
-  padding: 24px 28px;
-  border-left: 2px solid var(--accent-dim);
-  background: rgba(212, 160, 57, 0.03);
-  border-radius: 0 6px 6px 0;
-}
-
-.tech-philosophy p {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.8;
-  font-style: italic;
-}
-
+.tech-channels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.tech-channel { padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
+.tech-channel h4 { font-family: var(--font-mono); font-size: 11px; font-weight: 600; margin-bottom: 6px; color: var(--cyan); }
+.tech-channel p { font-size: 11px; line-height: 1.5; }
+.tech-philosophy { margin-top: 40px; padding: 24px 28px; border-left: 2px solid var(--accent-dim); background: rgba(212, 160, 57, 0.03); border-radius: 0 6px 6px 0; }
+.tech-philosophy p { font-size: 14px; color: var(--muted); line-height: 1.8; font-style: italic; }
 .tech-philosophy b { color: var(--text); font-style: normal; }
 
 @media (max-width: 768px) {
@@ -591,246 +400,77 @@ section p.lead {
   .tech-channels { grid-template-columns: 1fr; }
 }
 
-/* MODELS */
-.models-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  margin-top: 40px;
-}
-
-.model-card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  padding: 28px 24px;
-  border-radius: 8px;
-  transition: border-color 0.2s;
-}
-
-.model-card:hover {
-  border-color: #2a2c32;
-}
-
-.model-card h3 {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.model-card .examples {
-  font-size: 12px;
-  color: var(--accent-dim);
-  font-family: var(--font-mono);
-  margin-bottom: 10px;
-}
-
-.model-card p {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.6;
-}
+/* ARCHITECTURE */
+.arch-section { border-top: 1px solid var(--border); }
+.arch-table { margin-top: 40px; overflow-x: auto; }
+.arch-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.arch-table th, .arch-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+.arch-table th { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.arch-table td { color: var(--muted); }
+.arch-table td:first-child { font-family: var(--font-mono); font-weight: 600; color: var(--text); font-size: 12px; }
+.arch-table .hl { color: var(--cyan); }
+.arch-diagram { margin-top: 32px; text-align: center; }
+.arch-diagram img { max-width: 500px; width: 100%; border-radius: 8px; border: 1px solid var(--border); }
+.arch-note { margin-top: 16px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); text-align: center; }
 
 /* BENCHMARK TABLE */
-.bench-table {
-  margin-top: 40px;
-  overflow-x: auto;
-}
-
-.bench-table table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.bench-table th,
-.bench-table td {
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-}
-
-.bench-table th {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 600;
-}
-
+.bench-section { border-top: 1px solid var(--border); }
+.bench-table { margin-top: 40px; overflow-x: auto; }
+.bench-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bench-table th, .bench-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+.bench-table th { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .bench-table td { color: var(--muted); }
-
-.bench-table td:first-child {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--text);
-  font-size: 12px;
-}
-
+.bench-table td:first-child { font-family: var(--font-mono); font-weight: 600; color: var(--text); font-size: 12px; }
 .bench-table .pass { color: var(--cyan); }
-
-.bench-table .recommend {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 16px;
-  font-style: italic;
-}
-
-.bench-table .recommend b { color: var(--accent); font-style: normal; }
+.bench-recommend { font-size: 13px; color: var(--muted); margin-top: 20px; line-height: 1.8; }
+.bench-recommend b { color: var(--accent); font-weight: 600; }
 
 /* PRIVACY */
-.privacy-section {
-  background: var(--bg-elevated);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-
-.privacy-flow {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 32px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  white-space: pre;
-  overflow-x: auto;
-  line-height: 1.8;
-}
-
+.privacy-section { background: var(--bg-elevated); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.privacy-flow { font-family: var(--font-mono); font-size: 13px; color: var(--muted); margin-top: 32px; padding: 24px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); white-space: pre; overflow-x: auto; line-height: 1.8; }
 .privacy-flow .hl { color: var(--accent); }
-
-.privacy-points {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-top: 32px;
-}
-
-.privacy-points li {
-  list-style: none;
-  font-size: 14px;
-  color: var(--muted);
-  padding-left: 20px;
-  position: relative;
-  line-height: 1.6;
-}
-
-.privacy-points li::before {
-  content: '→';
-  position: absolute;
-  left: 0;
-  color: var(--accent);
-}
+.privacy-points { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 32px; }
+.privacy-points li { list-style: none; font-size: 14px; color: var(--muted); padding-left: 20px; position: relative; line-height: 1.6; }
+.privacy-points li::before { content: '\2192'; position: absolute; left: 0; color: var(--accent); }
 
 /* GETTING STARTED */
-.start-paths {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-top: 36px;
-}
+.start-paths { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 36px; }
+.start-path { border: 1px solid var(--border); background: var(--bg-elevated); border-radius: 8px; padding: 28px; }
+.start-path.highlight { border-color: rgba(212, 160, 57, 0.35); background: linear-gradient(135deg, rgba(212, 160, 57, 0.08), transparent 65%), var(--bg-elevated); }
+.start-path h3 { font-family: var(--font-mono); font-size: 14px; margin-bottom: 12px; }
+.start-path ol { padding-left: 20px; color: var(--muted); font-size: 14px; line-height: 1.9; }
 
-.start-path {
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  border-radius: 8px;
-  padding: 28px;
-}
-
-.start-path.highlight {
-  border-color: rgba(212, 160, 57, 0.35);
-  background: linear-gradient(135deg, rgba(212, 160, 57, 0.08), transparent 65%), var(--bg-elevated);
-}
-
-.start-path h3 {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  margin-bottom: 12px;
-}
-
-.start-path ol {
-  padding-left: 20px;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.9;
-}
-
-.start-code {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 24px;
-  margin-top: 24px;
-  overflow-x: auto;
-  line-height: 1.8;
-  color: var(--muted);
-}
-
+.start-code { font-family: var(--font-mono); font-size: 13px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; padding: 24px; margin-top: 24px; overflow-x: auto; line-height: 1.8; color: var(--muted); }
 .start-code .cmd { color: var(--text); }
 .start-code .comment { color: #555; }
 
+/* ROADMAP */
+.roadmap-section { border-top: 1px solid var(--border); }
+.roadmap-list { margin-top: 32px; padding-left: 0; list-style: none; display: grid; gap: 12px; }
+.roadmap-list li { font-size: 15px; color: var(--muted); padding: 14px 18px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elevated); line-height: 1.6; }
+.roadmap-list li::before { content: '\2192'; margin-right: 10px; color: var(--accent); }
+
+/* ACKNOWLEDGMENTS */
+.ack-list { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 16px; }
+.ack-item { padding: 14px 20px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elevated); }
+.ack-item a { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text); text-decoration: none; transition: color 0.2s; }
+.ack-item a:hover { color: var(--accent); }
+.ack-item p { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
 /* FOOTER */
-footer {
-  border-top: 1px solid var(--border);
-  padding: 40px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-footer .copy {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-footer .links {
-  display: flex;
-  gap: 24px;
-}
-
-footer .links a {
-  font-size: 12px;
-  color: var(--muted);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
+footer { border-top: 1px solid var(--border); padding: 40px; display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin: 0 auto; }
+footer .copy { font-size: 12px; color: var(--muted); }
+footer .links { display: flex; gap: 24px; }
+footer .links a { font-size: 12px; color: var(--muted); text-decoration: none; transition: color 0.2s; }
 footer .links a:hover { color: var(--text); }
 
 /* ANIMATIONS */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes borderGlow { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
 
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
-@keyframes borderGlow {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-/* SCROLL REVEAL */
-.reveal {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.7s ease, transform 0.7s ease;
-}
-
-.reveal.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
 
 /* RESPONSIVE */
 @media (max-width: 768px) {
@@ -843,7 +483,6 @@ footer .links a:hover { color: var(--text); }
   .announce { padding: 0 20px 60px; }
   .announce-panel { grid-template-columns: 1fr; padding: 28px; }
   .start-paths { grid-template-columns: 1fr; }
-  .models-grid { grid-template-columns: 1fr; }
   .privacy-points { grid-template-columns: 1fr; }
   .vd-visual { flex-direction: column; gap: 16px; }
   .vd-screen { width: 140px; height: 240px; }
@@ -879,7 +518,90 @@ footer .links a:hover { color: var(--text); }
   <p class="hero-sub">商业 AI 手机是黑盒。OpenCyvis 不是。你可以查看代码、选择模型、掌控数据。</p>
   <p class="hero-name"><b>Open</b> <b>Cy</b>ber Jar<b>vis</b></p>
 
-  <div class="vd-visual">
+  <div class="hero-demo">
+    <img src="docs/demos/home_screen.png" alt="OpenCyvis v2 主界面">
+    <div class="hero-demo-caption">OpenCyvis v2 主界面</div>
+  </div>
+</section>
+
+<!-- V2 公告 -->
+<div class="announce reveal">
+  <div class="announce-panel">
+    <div>
+      <div class="section-label">v2.0 已发布</div>
+      <h2>v2.0 来了 — 适用于任何手机。</h2>
+      <p>标准模式不需要定制 ROM。安装 App，按设置向导完成 ADB 无线配对，选择 LLM 后端，即可使用。你可以从中通过 IM 发送任务、在聊天里收到结果和截图，并使用为日常场景重新设计的界面。</p>
+      <div class="announce-note">完全开源。Apache 2.0。</div>
+    </div>
+    <div class="announce-list">
+      <span>安装即可用 — 无需 Root、无需电脑</span>
+      <span>通过飞书 / Telegram 远程控制</span>
+      <span>例行任务 — 定时自动执行</span>
+      <span>Provider Profiles — 一键切换模型</span>
+      <span>全新浅色与深色界面</span>
+    </div>
+  </div>
+</div>
+
+<!-- WHY -->
+<section class="reveal">
+  <div class="section-label">为什么</div>
+  <h2>你至少应该拥有选择权。</h2>
+  <p class="lead">当一家公司推出「AI 手机」时，它可以接触你的屏幕、应用、消息——而你看不到运行的是什么模型，无法验证什么数据离开了设备，也无法选择替代方案。</p>
+
+  <div class="why-grid">
+    <div class="why-point">
+      <h3>Doubao AI Phone</h3>
+      <p>绑定字节跳动的模型。</p>
+    </div>
+    <div class="why-point">
+      <h3>Samsung Galaxy AI</h3>
+      <p>绑定三星与 Google。</p>
+    </div>
+    <div class="why-point">
+      <h3>Google Built-in AI</h3>
+      <p>只能使用 Gemini。你只能接受它提供的选择。</p>
+    </div>
+    <div class="why-point">
+      <h3>OpenCyvis</h3>
+      <p>你能看到代码。你能选择模型。你决定数据去向哪里。</p>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="full compare-section reveal">
+  <div class="compare-table">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>商业 AI 手机</th>
+          <th>云手机</th>
+          <th>手机控制脚本</th>
+          <th>OpenCyvis</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>开源</td><td>&#10005;</td><td>&#10005;</td><td>⚠️</td><td>&#10003;</td></tr>
+        <tr><td>自选 AI 模型</td><td>&#10005;</td><td>&#10005;</td><td>⚠️</td><td>&#10003;</td></tr>
+        <tr><td>数据留在设备上</td><td>&#10005;</td><td>&#10005;</td><td>⚠️</td><td>&#10003;</td></tr>
+        <tr><td>AI 工作时手机照常用</td><td>⚠️</td><td>&#10003;</td><td>&#10005;</td><td>&#10003;</td></tr>
+        <tr><td>支持所有应用</td><td>⚠️</td><td>⚠️</td><td>⚠️</td><td>&#10003;</td></tr>
+        <tr><td>无需电脑设置</td><td>⚠️</td><td>⚠️</td><td>&#10005;</td><td>&#10003;</td></tr>
+        <tr><td>适用于日常手机</td><td>&#10003;</td><td>⚠️</td><td>&#10005;</td><td>&#10003;</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="reveal">
+  <div class="section-label">功能</div>
+  <h2>它能做什么</h2>
+  <p class="lead">用自然语言给它一个任务——它看到你的屏幕，理解 UI，像你一样操作应用。</p>
+
+  <div class="vd-visual" style="margin-bottom: 48px;">
     <div class="vd-screen yours">
       <div class="vd-content">
         <div class="vd-line"></div>
@@ -901,157 +623,39 @@ footer .links a:hover { color: var(--text); }
       <div class="vd-label">AI 在这里工作</div>
     </div>
   </div>
-</section>
-
-<!-- V2 ANNOUNCEMENT -->
-<div class="announce reveal">
-  <div class="announce-panel">
-    <div>
-      <div class="section-label">v2.0 预告</div>
-      <h2>v2.0 即将到来，并且适用于任何手机。</h2>
-      <p>不需要定制 ROM。安装应用，跟随设置向导，就能让 OpenCyvis 在你的日常 Android 手机上工作。你可以从聊天软件发送任务，在聊天里收到结果和截图，并使用为日常场景重新设计的界面。</p>
-      <div class="announce-note">v2.0 即将开源。</div>
-    </div>
-    <div class="announce-list">
-      <span>安装即可开始</span>
-      <span>从聊天中远程控制</span>
-      <span>全新的浅色与深色界面</span>
-    </div>
-  </div>
-</div>
-
-<!-- WHY -->
-<section class="reveal">
-  <div class="section-label">为什么</div>
-  <h2>你至少应该拥有选择权。</h2>
-  <p class="lead">当一家公司推出“AI 手机”时，它可以接触你的屏幕、应用、消息和支付场景，而你看不到模型，无法验证哪些数据离开设备，也无法选择替代方案。</p>
-
-  <div class="why-grid">
-    <div class="why-point">
-      <h3>Doubao AI Phone</h3>
-      <p>绑定字节跳动的模型。</p>
-    </div>
-    <div class="why-point">
-      <h3>Samsung Galaxy AI</h3>
-      <p>绑定三星与 Google。</p>
-    </div>
-    <div class="why-point">
-      <h3>Google Built-in AI</h3>
-      <p>只能使用 Gemini。你只能接受它提供的选择。</p>
-    </div>
-    <div class="why-point">
-      <h3>OpenCyvis</h3>
-      <p>你能看到代码。你能选择模型。你决定数据流向哪里。</p>
-    </div>
-  </div>
-</section>
-
-<!-- COMPARISON -->
-<section class="full compare-section reveal">
-  <div class="compare-table">
-    <table>
-      <thead>
-        <tr>
-          <th></th>
-          <th>商业 AI 手机</th>
-          <th>云手机</th>
-          <th>手机控制脚本</th>
-          <th>OpenCyvis</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>开源</td>
-          <td>&#10005;</td>
-          <td>&#10005;</td>
-          <td>⚠️</td>
-          <td>&#10003;</td>
-        </tr>
-        <tr>
-          <td>选择你的 AI 模型</td>
-          <td>&#10005;</td>
-          <td>&#10005;</td>
-          <td>⚠️</td>
-          <td>&#10003;</td>
-        </tr>
-        <tr>
-          <td>数据留在设备上</td>
-          <td>&#10005;</td>
-          <td>&#10005;</td>
-          <td>⚠️</td>
-          <td>&#10003;</td>
-        </tr>
-        <tr>
-          <td>AI 工作时手机仍可使用</td>
-          <td>⚠️</td>
-          <td>&#10003;</td>
-          <td>&#10005;</td>
-          <td>&#10003;</td>
-        </tr>
-        <tr>
-          <td>适用于任何应用</td>
-          <td>⚠️</td>
-          <td>⚠️</td>
-          <td>⚠️</td>
-          <td>&#10003;</td>
-        </tr>
-        <tr>
-          <td>无需电脑设置</td>
-          <td>⚠️</td>
-          <td>⚠️</td>
-          <td>&#10005;</td>
-          <td>&#10003;</td>
-        </tr>
-        <tr>
-          <td>适用于日常手机</td>
-          <td>&#10003;</td>
-          <td>⚠️</td>
-          <td>&#10005;</td>
-          <td>&#10003;</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<!-- FEATURES -->
-<section id="features" class="reveal">
-  <div class="section-label">功能</div>
-  <h2>它能做什么</h2>
-  <p class="lead">用自然语言交代任务。它能看见屏幕、理解界面，并像你一样操作应用。现在，这一切被放进了为普通手机设计的应用体验里。</p>
 
   <div class="features-grid">
     <div class="feature-card">
+      <h3>后台运行</h3>
+      <p>AI 在虚拟显示器上运行——你的手机照常用。订机票的同时继续刷微博。</p>
+    </div>
+    <div class="feature-card">
       <h3>适用于任何 Android 手机</h3>
-      <p>不需要定制 ROM，也不需要电脑。安装应用并跟随设置向导即可。</p>
+      <p>不需要定制 ROM，不需要电脑。安装 App 并跟随设置向导即可。</p>
     </div>
     <div class="feature-card">
-      <h3>通过聊天远程控制</h3>
-      <p>从 Telegram 或飞书发送任务，并直接在聊天中收到结果和截图。</p>
+      <h3>IM 远程控制</h3>
+      <p>从飞书或 Telegram 发送任务，直接在聊天中收到结果和截图。</p>
     </div>
     <div class="feature-card">
-      <h3>例行任务</h3>
-      <p>保存常用任务，一键再次运行。</p>
+      <h3>例行任务（Routines）</h3>
+      <p>保存常用操作，定时自动执行或一键触发。也支持地理围栏。</p>
+    </div>
+    <div class="feature-card">
+      <h3>Provider Profiles</h3>
+      <p>保存多个 AI 配置方案，一键切换。无需每次重填 API 地址和密钥。</p>
     </div>
     <div class="feature-card">
       <h3>深色模式</h3>
-      <p>应用与控制界面均支持完整的日间/夜间主题。</p>
+      <p>完整的日夜主题。跟随系统设置自动切换，也可手动指定。</p>
     </div>
     <div class="feature-card">
-      <h3>适配多种 ROM</h3>
-      <p>适配 MIUI、ColorOS、OriginOS 以及其他 Android 变体。</p>
-    </div>
-    <div class="feature-card">
-      <h3>后台运行</h3>
-      <p>AI 在自己的空间里工作，你的手机仍可继续使用。</p>
+      <h3>多 ROM 适配</h3>
+      <p>标准模式支持 MIUI、ColorOS、OriginOS 等主流国产 ROM。</p>
     </div>
     <div class="feature-card">
       <h3>任意 AI 模型</h3>
-      <p>使用你偏好的模型或服务，也包括本地选项。</p>
-    </div>
-    <div class="feature-card">
-      <h3>理解屏幕</h3>
-      <p>理解屏幕上可见的内容，并操作正确的控件。</p>
+      <p>云端、私有或本地——使用你偏好的模型或服务。</p>
     </div>
     <div class="feature-card">
       <h3>观看与接管</h3>
@@ -1059,11 +663,11 @@ footer .links a:hover { color: var(--text); }
     </div>
     <div class="feature-card">
       <h3>不确定时会提问</h3>
-      <p>遇到歧义会暂停询问，而不是盲目猜测。比如：“你指的是哪位张伟？我看到三位。”</p>
+      <p>遇到歧义会暂停询问，而不是盲目猜测。比如："你指的是哪位张伟？我看到三位。"</p>
     </div>
     <div class="feature-card">
       <h3>离线语音</h3>
-      <p>设备端语音识别，无需联网。</p>
+      <p>基于 Sherpa-ONNX 的设备端语音识别，无需联网。</p>
     </div>
   </div>
 </section>
@@ -1075,7 +679,6 @@ footer .links a:hover { color: var(--text); }
   <p class="lead">OpenCyvis 围绕选择权而设计：你的手机、你偏好的模型、你的数据规则，以及可审查 AI 行为的清晰路径。</p>
 
   <div class="tech-grid">
-
     <div class="tech-card featured">
       <div>
         <div class="tech-num">01 — 清晰控制</div>
@@ -1084,14 +687,8 @@ footer .links a:hover { color: var(--text); }
       </div>
       <div>
         <div class="tech-channels">
-          <div class="tech-channel">
-            <h4>观看</h4>
-            <p>在不打断当前使用的情况下跟进任务。</p>
-          </div>
-          <div class="tech-channel">
-            <h4>接管</h4>
-            <p>当任务需要你的判断时直接介入。</p>
-          </div>
+          <div class="tech-channel"><h4>观看</h4><p>在不打断当前使用的情况下跟进任务。</p></div>
+          <div class="tech-channel"><h4>接管</h4><p>当任务需要你的判断时直接介入。</p></div>
         </div>
         <div class="tech-detail">为日常任务而设计，重视正确结果，而不盲目追求完全自动化。</div>
       </div>
@@ -1100,7 +697,7 @@ footer .links a:hover { color: var(--text); }
     <div class="tech-card">
       <div class="tech-num">02 — 选择</div>
       <h3>使用你信任的模型</h3>
-      <p>连接云端模型、私有服务或本地模型。OpenCyvis 不绑定任何单一 AI 厂商。</p>
+      <p>连接云端模型、私有服务或通过 Ollama 运行本地模型。OpenCyvis 不绑定任何单一 AI 厂商。</p>
     </div>
 
     <div class="tech-card">
@@ -1118,9 +715,8 @@ footer .links a:hover { color: var(--text); }
     <div class="tech-card">
       <div class="tech-num">05 — 开放</div>
       <h3>开源是产品承诺</h3>
-      <p>v2.0 代码将会发布，让用户、开发者和研究者都能检查应用的行为。</p>
+      <p>所有代码已在 Apache 2.0 下公开。用户、开发者和研究者都能检查应用的行为。</p>
     </div>
-
   </div>
 
   <div class="tech-philosophy">
@@ -1128,45 +724,81 @@ footer .links a:hover { color: var(--text); }
   </div>
 </section>
 
-<!-- MODELS -->
-<section id="models" class="reveal">
+<!-- ARCHITECTURE -->
+<section id="arch" class="arch-section reveal">
+  <div class="section-label">架构</div>
+  <h2>双后端，统一体验</h2>
+  <p class="lead">两种安装模式共享全部上层代码。差异仅在权限层，通过 <code style="font-family:var(--font-mono);font-size:13px;background:var(--bg-elevated);border:1px solid var(--border);padding:2px 6px;border-radius:3px;color:var(--cyan);">PrivilegeBackend</code> 接口隔离。</p>
+
+  <div class="arch-table">
+    <table>
+      <thead>
+        <tr><th></th><th>SystemBackend</th><th>RemoteBackend</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>权限来源</td><td>平台签名（uid system）</td><td>ADB shell（uid 2000）</td></tr>
+        <tr><td>输入注入</td><td>InputManager 反射</td><td>AIDL 代理到 PrivilegedService</td></tr>
+        <tr><td>截屏</td><td><span class="hl">SurfaceControl.screenshot()</span></td><td>ImageReader 从 VD Surface 读取</td></tr>
+        <tr><td>VD 任务管理</td><td>ActivityTaskManager 反射</td><td>PrivilegedService 代理</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="arch-diagram">
+    <img src="docs/demos/backend_architecture.png" alt="双 Backend 架构">
+  </div>
+  <div class="arch-note">运行时自动选择 Backend。</div>
+</section>
+
+<!-- MODELS / BENCHMARKS -->
+<section id="models" class="bench-section reveal">
   <div class="section-label">模型</div>
   <h2>模型无关</h2>
   <p class="lead">使用你自己的 AI 账号，连接私有服务，或在最重视隐私时选择本地运行。</p>
 
-  <div class="models-grid">
-    <div class="model-card">
-      <h3>云端模型</h3>
-      <div class="examples">快速且强大</div>
-      <p>当你需要更好的质量与速度时，使用托管模型。</p>
-    </div>
-    <div class="model-card">
-      <h3>私有服务</h3>
-      <div class="examples">团队或个人服务</div>
-      <p>让请求经过你控制的基础设施。</p>
-    </div>
-    <div class="model-card">
-      <h3>本地模型</h3>
-      <div class="examples">最大控制权</div>
-      <p>运行任务时不把手机上下文发送给第三方服务。</p>
-    </div>
+  <div class="bench-table">
+    <table>
+      <thead>
+        <tr><th colspan="4" style="color:var(--accent);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">云端模型</th></tr>
+        <tr><th>模型</th><th>每步延迟</th><th>通过率</th><th>备注</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Qwen 3.5 Plus</b></td><td>4-6s</td><td class="pass">4/4</td><td>稳定，推荐</td></tr>
+        <tr><td><b>Claude Opus 4</b></td><td>4-8s</td><td class="pass">4/4</td><td>推理质量最高</td></tr>
+        <tr><td><b>MiMo v2.5</b></td><td>2.3-4.5s</td><td class="pass">4/4</td><td>速度最快</td></tr>
+        <tr><td><b>GPT-4o</b></td><td>3-6s</td><td>3/4</td><td>偶尔忽略 tool_choice</td></tr>
+      </tbody>
+    </table>
+
+    <table style="margin-top: 32px;">
+      <thead>
+        <tr><th colspan="4" style="color:var(--accent);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">本地模型（通过 Ollama）</th></tr>
+        <tr><th>模型</th><th>体积</th><th>速度</th><th>通过率</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Gemma 4 26B-A4B</b> Q4</td><td>17 GB</td><td>63 tok/s</td><td class="pass">4/4</td></tr>
+        <tr><td><b>Gemma 4 E2B</b> Q4</td><td>1.8 GB</td><td>41 tok/s</td><td class="pass">4/4</td></tr>
+        <tr><td><b>Qwen 3.5 35B-A3B</b> Q4</td><td>22 GB</td><td>47 tok/s</td><td>3/4</td></tr>
+        <tr><td><b>Gemma 4 E4B</b> Q4</td><td>3 GB</td><td>61 tok/s</td><td>3/4</td></tr>
+      </tbody>
+    </table>
   </div>
+
+  <p class="bench-recommend"><b>推荐：</b>Gemma 4 26B-A4B — 速度、质量、显存的最佳平衡。<br><b>极简：</b>Gemma 4 E2B — 仅 1.8 GB，依然通过全部 4 项测试。</p>
 </section>
 
 <!-- PRIVACY -->
 <section class="privacy-section full reveal">
   <div style="max-width: 1000px; margin: 0 auto; padding: 120px 40px;">
     <div class="section-label">隐私与安全</div>
-    <h2>这里不该只靠“请相信我们”。</h2>
-    <p class="lead">能访问手机的 AI 助理，是你能运行的最高权限软件之一。</p>
+    <h2>这里不该只靠"请相信我们"。</h2>
+    <p class="lead">拥有完整手机访问权限的 AI 智能体，是你能运行的最高特权软件之一。</p>
 
     <ul class="privacy-points">
-      <li>任务上下文只用于你交给 OpenCyvis 的工作</li>
-      <li>你选择 AI 服务：托管、私有或本地</li>
-      <li>无遥测、无分析、无回传，没有追踪代码</li>
-      <li>可选择本地模型以获得最高隐私</li>
-      <li>开源后，安全研究者、记者和任何人都可以审查</li>
-      <li>代码完全公开，始终如此。</li>
+      <li>AI 服务你来选 — 托管、私有或本地</li>
+      <li>无遥测、无分析、不偷偷联网 — 零追踪代码</li>
+      <li>开源 — 任何人都能审计</li>
+      <li>本地模型选项 — 数据不出设备</li>
     </ul>
 
     <div class="privacy-flow">你的任务 ──→ OpenCyvis（<span class="hl">在你的手机上</span>）──→ 你选择的 AI ──→ 结果
@@ -1178,37 +810,102 @@ footer .links a:hover { color: var(--text); }
 <!-- GETTING STARTED -->
 <section id="start" class="reveal">
   <div class="section-label">开始使用</div>
-  <h2>两种尝试方式</h2>
-  <p class="lead">v2.0 正在准备更简单的应用内设置流程。v1.0 仍然可供希望从源码构建的开发者使用。</p>
+  <h2>两种安装方式</h2>
+  <p class="lead">日常使用选标准模式，追求极致性能选系统 App 模式（需 AOSP）。</p>
 
   <div class="start-paths">
     <div class="start-path highlight">
-      <h3>v2.0 — 即将推出</h3>
+      <h3>标准模式（推荐）</h3>
       <ol>
-        <li>安装应用</li>
-        <li>跟随设置向导</li>
+        <li>下载 <code style="font-family:var(--font-mono);font-size:12px;background:var(--bg);border:1px solid var(--border);padding:1px 5px;border-radius:3px;color:var(--cyan);">opencyvis-standard-release.apk</code> 并安装</li>
+        <li>打开 App，跟随设置向导完成无线配对</li>
+        <li>在设置中配置 LLM Provider</li>
         <li>开始发送任务</li>
       </ol>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted);">不需要 Root，不需要电脑，不需要刷机。支持 Android 11+。</p>
     </div>
     <div class="start-path">
-      <h3>v1.0 — 现在可用</h3>
+      <h3>系统 App 模式</h3>
       <ol>
         <li>克隆仓库</li>
-        <li>从源码构建</li>
-        <li>跟随开发者设置指南</li>
+        <li>从源码构建系统 APK</li>
+        <li>刷入 AOSP 作为系统应用</li>
       </ol>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted);">适用于构建自定义 AOSP 镜像的开发者。</p>
     </div>
   </div>
 
-  <pre class="start-code"><span class="comment"># v1.0 开发者构建</span>
+  <table class="start-path" style="margin-top:24px;width:100%;border:1px solid var(--border);border-radius:8px;border-spacing:0;overflow:hidden;">
+    <thead>
+      <tr style="background:var(--bg-elevated);">
+        <th style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:12px 14px;text-align:left;">APK</th>
+        <th style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:12px 14px;text-align:left;">适用</th>
+        <th style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:12px 14px;text-align:left;">包名</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="font-family:var(--font-mono);font-size:12px;padding:12px 14px;color:var(--text);">opencyvis-standard-release.apk</td>
+        <td style="font-size:13px;padding:12px 14px;color:var(--muted);">大多数用户 — 任何 Android 11+ 手机</td>
+        <td style="font-family:var(--font-mono);font-size:12px;padding:12px 14px;color:var(--muted);">ai.opencyvis.standard</td>
+      </tr>
+      <tr>
+        <td style="font-family:var(--font-mono);font-size:12px;padding:12px 14px;color:var(--text);">opencyvis-system-release.apk</td>
+        <td style="font-size:13px;padding:12px 14px;color:var(--muted);">开发者 — 刷入 AOSP</td>
+        <td style="font-family:var(--font-mono);font-size:12px;padding:12px 14px;color:var(--muted);">ai.opencyvis</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <pre class="start-code"><span class="comment"># 系统 App 模式构建</span>
 <span class="cmd">git clone https://github.com/opencyvis/opencyvis-phone.git</span>
 <span class="cmd">cd opencyvis-phone/android</span>
-<span class="cmd">./gradlew assembleRelease</span></pre>
+<span class="cmd">./gradlew assembleSystemRelease</span></pre>
+
+  <pre class="start-code" style="margin-top:16px;"><span class="comment"># 通过 deeplink 配置 LLM</span>
+<span class="comment"># 本地 Ollama（完全私密）</span>
+<span class="cmd">adb shell am start -a android.intent.action.VIEW \</span>
+<span class="cmd">  -d "opencyvis://config?provider=ollama&amp;base_url=http://localhost:11434&amp;model=gemma4:26b"</span>
+
+<span class="comment"># 云端 API</span>
+<span class="cmd">adb shell am start -a android.intent.action.VIEW \</span>
+<span class="cmd">  -d "opencyvis://config?provider=openai&amp;base_url=https://api.example.com/v1&amp;api_key=YOUR_KEY&amp;model=qwen-vl-max"</span></pre>
+
+  <p style="margin-top:16px;font-size:13px;color:var(--muted);">从 <a href="https://github.com/opencyvis/opencyvis-phone/releases" style="color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-dim);">Releases 页面</a> 下载 APK。</p>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap" class="roadmap-section reveal">
+  <div class="section-label">路线图</div>
+  <h2>下一步</h2>
+
+  <ul class="roadmap-list">
+    <li>探索更便捷的权限支持方式</li>
+    <li>进一步优化本地模型支持</li>
+    <li>跨设备协同（手机 + 桌面）</li>
+  </ul>
+</section>
+
+<!-- ACKNOWLEDGMENTS -->
+<section class="ack-section reveal">
+  <div class="section-label">致谢</div>
+  <h2>站在巨人的肩膀上</h2>
+
+  <div class="ack-list">
+    <div class="ack-item">
+      <a href="https://github.com/k2-fsa/sherpa-onnx">Sherpa-ONNX</a>
+      <p>设备端语音识别 (Apache 2.0)</p>
+    </div>
+    <div class="ack-item">
+      <a href="https://github.com/RikkaApps/Shizuku">Shizuku</a>
+      <p>标准模式 ADB 权限获取 (Apache 2.0)</p>
+    </div>
+  </div>
 </section>
 
 <!-- FOOTER -->
 <footer>
-  <div class="copy">© 2026 OpenCyvis Contributors · Apache 2.0</div>
+  <div class="copy">&copy; 2026 OpenCyvis Contributors &middot; Apache 2.0</div>
   <div class="links">
     <a href="https://github.com/opencyvis/opencyvis-phone">GitHub</a>
     <a href="story.html">故事</a>
