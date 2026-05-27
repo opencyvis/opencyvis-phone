@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://docs.opencyvis.ai/zh/">文档</a> •
   <a href="README.md">English</a> •
   <a href="#快速开始">快速开始</a> •
   <a href="#路线图">路线图</a> •
