@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="opencyvis/opencyvis-phone"
-APK_NAME="OpenCyvis.apk"
+APK_NAME="opencyvis-system-release.apk"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT="$SCRIPT_DIR/$APK_NAME"
 
@@ -11,13 +11,13 @@ VERSION="${1:-latest}"
 if [ "$VERSION" = "latest" ]; then
     echo "Fetching latest release from $REPO ..."
     URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" \
-        | grep "browser_download_url.*\.apk" \
+        | grep "browser_download_url.*opencyvis-system-release\.apk" \
         | head -1 \
         | cut -d '"' -f 4)
 else
     echo "Fetching release $VERSION from $REPO ..."
     URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/tags/$VERSION" \
-        | grep "browser_download_url.*\.apk" \
+        | grep "browser_download_url.*opencyvis-system-release\.apk" \
         | head -1 \
         | cut -d '"' -f 4)
 fi
