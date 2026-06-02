@@ -6,6 +6,7 @@
         <permission name="android.permission.CAPTURE_SECURE_VIDEO_OUTPUT"/>
         <permission name="android.permission.INTERNAL_SYSTEM_WINDOW"/>
         <permission name="android.permission.MANAGE_ACTIVITY_TASKS"/>
+        <permission name="android.permission.INTERACT_ACROSS_USERS_FULL"/>
         <permission name="android.permission.SCHEDULE_EXACT_ALARM"/>
     </privapp-permissions>
 </permissions>
