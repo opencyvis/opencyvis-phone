@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="opencyvis/opencyvis-phone"
-APK_NAME="opencyvis-system-release.apk"
+APK_NAME="OpenCyvis.apk"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT="$SCRIPT_DIR/$APK_NAME"
 
