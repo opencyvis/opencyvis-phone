@@ -538,6 +538,17 @@ class PrivilegedService : IPrivilegedService.Stub() {
         }
     }
 
+    override fun forceStopPackage(packageName: String) {
+        checkCaller()
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("am", "force-stop", packageName))
+            process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+            Log.i(TAG, "forceStopPackage: $packageName")
+        } catch (e: Exception) {
+            Log.w(TAG, "forceStopPackage failed: ${e.message}")
+        }
+    }
+
     override fun releaseVirtualDisplay() {
         try {
             mirrorVd?.release()

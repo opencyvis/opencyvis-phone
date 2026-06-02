@@ -21,6 +21,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Heads-up the pairing-code notification even when our process is backgrounded/frozen -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Let the user exempt us from battery optimization so aggressive OEM freezers
+         (e.g. ColorOS HansManager) are less likely to suspend the pairing service -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Package visibility: allows list_apps to discover all installed apps (Android 11+) -->
     <queries>
@@ -106,6 +111,8 @@
             android:name=".backend.SetupActivity"
             android:exported="false"
             android:label="Backend Setup"
+            android:configChanges="screenSize|screenLayout|smallestScreenSize"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.OpenCyvis.NoActionBar" />
 
         <activity
@@ -114,6 +121,18 @@
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:exported="false" />
+
+        <activity
+            android:name=".backend.SplitScreenPocActivity"
+            android:exported="true"
+            android:configChanges="screenSize|screenLayout|smallestScreenSize"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.OpenCyvis.NoActionBar">
+            <intent-filter>
+                <action android:name="ai.opencyvis.SPLIT_POC" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".AgentService"

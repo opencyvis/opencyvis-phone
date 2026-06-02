@@ -55,6 +55,33 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <TextView
+            android:id="@+id/setup_otp_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/setup_pair_split_label"
+            android:textSize="16sp"
+            android:textColor="?android:attr/textColorPrimary"
+            android:gravity="center"
+            android:visibility="gone"
+            android:layout_marginBottom="12dp" />
+
+        <ai.opencyvis.backend.OtpDigitBox
+            android:id="@+id/setup_otp_box"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp" />
+
+        <ai.opencyvis.backend.NumberPadView
+            android:id="@+id/setup_number_pad"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/setup_action_button"
             android:layout_width="match_parent"

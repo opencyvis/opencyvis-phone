@@ -31,6 +31,8 @@
     <string name="setup_pair_notif_desc">点击「无线调试」→「使用配对码配对设备」，然后输入 %1$d 位配对码</string>
     <string name="setup_pair_hint">%1$d 位配对码</string>
     <string name="setup_pair_btn">配对</string>
+    <!-- Notification action label: clearer than just "配对" so users pulling down the shade know where to type -->
+    <string name="setup_notif_input_btn">点此输入配对码</string>
 
     <!-- Errors -->
     <string name="setup_error_wrong_code">配对码不正确，请重新输入</string>
@@ -57,9 +59,15 @@
 
     <string name="setup_reconnecting">正在尝试重新连接…</string>
 
+    <!-- Split-screen pairing context -->
+    <string name="setup_pair_split_label">输入配对码</string>
+    <string name="setup_pair_split_label_with_port">输入配对码（端口 %1$d）</string>
+    <string name="setup_pair_split_hint">在另一侧的「无线调试」设置中，点击「使用配对码配对设备」获取配对码</string>
+
     <!-- Actions -->
     <string name="setup_action_retry">重试</string>
     <string name="setup_action_manual_input">手动输入</string>
     <string name="setup_action_done">我已完成</string>
     <string name="setup_action_stop">停止</string>
+    <string name="setup_open_settings_manual">请手动进入：设置 → 系统 → 开发者选项 → 无线调试</string>
 </resources>

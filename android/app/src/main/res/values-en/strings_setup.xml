@@ -27,6 +27,8 @@
     <string name="setup_pair_notif_desc">Tap \"Wireless debugging\" → \"Pair device with pairing code\", then enter the %1$d-digit code</string>
     <string name="setup_pair_hint">%1$d-digit code</string>
     <string name="setup_pair_btn">Pair</string>
+    <!-- Notification action label: clearer than just "Pair" so users pulling down the shade know where to type -->
+    <string name="setup_notif_input_btn">Enter pairing code</string>
 
     <string name="setup_error_wrong_code">Wrong code. Please try again.</string>
     <string name="setup_error_code_expired">Code expired. Please get a new one from Settings.</string>
@@ -48,8 +50,14 @@
     <string name="setup_notif_channel_desc">ADB wireless debugging pairing guidance</string>
 
     <string name="setup_reconnecting">Reconnecting…</string>
+
+    <!-- Split-screen pairing context -->
+    <string name="setup_pair_split_label">Enter pairing code</string>
+    <string name="setup_pair_split_label_with_port">Enter pairing code (port %1$d)</string>
+    <string name="setup_pair_split_hint">Tap \"Pair device with pairing code\" in the Wireless Debugging settings on the other side</string>
     <string name="setup_action_retry">Retry</string>
     <string name="setup_action_manual_input">Manual input</string>
     <string name="setup_action_done">I\'m done</string>
     <string name="setup_action_stop">Stop</string>
+    <string name="setup_open_settings_manual">Please open Settings → System → Developer options → Wireless debugging manually</string>
 </resources>

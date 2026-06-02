@@ -28,4 +28,8 @@ interface IPrivilegedService {
 
     /** Launch home/launcher on a display to ensure something renders (recovery for empty VD). */
     void ensureVdHasContent(int displayId);
+
+    /** Force-stop a package (shell uid). Used to dismiss split-screen by killing the
+        adjacent Settings pane after ADB pairing completes. */
+    void forceStopPackage(String packageName);
 }

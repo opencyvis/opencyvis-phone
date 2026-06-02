@@ -1,5 +1,6 @@
 package ai.opencyvis.backend
 
+import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -13,7 +14,7 @@ import com.google.android.material.textfield.TextInputLayout
 class PairingDialogActivity : AppCompatActivity() {
 
     companion object {
-        private const val EXTRA_PORT = "port"
+        private const val EXTRA_PORT = "pairing_port"
 
         fun intent(context: Context, port: Int): Intent {
             return Intent(context, PairingDialogActivity::class.java).apply {
@@ -45,12 +46,20 @@ class PairingDialogActivity : AppCompatActivity() {
             }
             inputLayout.error = null
 
-            // Send code to AdbPairingService
+            // Build a RemoteInput-compatible intent that AdbPairingService can parse
+            val remoteInput = RemoteInput.Builder("pairing_code").setLabel("Pairing code").build()
+            val resultsBundle = Bundle().apply { putCharSequence("pairing_code", code) }
             val serviceIntent = Intent(this, AdbPairingService::class.java).apply {
                 action = "reply"
-                putExtra("code", code)
-                putExtra("port", port)
+                putExtra("pairing_port", port)
             }
+            // Attach RemoteInput results so the service can read them via
+            // RemoteInput.getResultsFromIntent()
+            RemoteInput.addResultsToIntent(
+                arrayOf(remoteInput),
+                serviceIntent,
+                resultsBundle
+            )
             startService(serviceIntent)
             finish()
         }

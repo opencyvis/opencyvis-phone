@@ -21,11 +21,14 @@ import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.Observer
 import ai.opencyvis.capture.ScreenCapture
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import moe.shizuku.manager.adb.AdbInvalidPairingCodeException
 import moe.shizuku.manager.adb.AdbKey
 import moe.shizuku.manager.adb.AdbMdns
@@ -47,6 +50,7 @@ class AdbPairingService : Service() {
         private const val SETTINGS_REQUEST_ID = 3
         private const val WIRELESS_DEBUG_REQUEST_ID = 4
         private const val STEP_DONE_REQUEST_ID = 5
+        private const val FULL_SCREEN_REQUEST_ID = 6
 
         private const val ACTION_START = "start"
         private const val ACTION_STOP = "stop"
@@ -60,6 +64,15 @@ class AdbPairingService : Service() {
 
         private const val GUIDE_ADVANCE_DELAY_MS = 10_000L
         private const val MDNS_TIMEOUT_MS = 30_000L
+
+        /**
+         * Time budget for the one-shot mDNS discovery performed at the moment
+         * the user submits a pairing code (see [onInputWithDiscovery]). On OEMs
+         * that freeze our background process (e.g. ColorOS HansManager) the
+         * RemoteInput submit is the point at which we're un-frozen, so we must
+         * find the live pairing service quickly within this window.
+         */
+        private const val PAIR_DISCOVERY_TIMEOUT_MS = 8_000L
 
         private const val PREFS_SETUP_PROGRESS = "setup_progress"
         private const val KEY_LAST_STEP = "last_step"
@@ -95,6 +108,9 @@ class AdbPairingService : Service() {
             context.getSharedPreferences(PREFS_SETUP_PROGRESS, MODE_PRIVATE)
                 .edit().remove(KEY_LAST_STEP).apply()
         }
+
+        /** Hot flow of the last discovered pairing port. 0 = not yet discovered. */
+        val pairingPort = MutableStateFlow(0)
     }
 
     // ── Guide step state ──────────────────────────────────────────────
@@ -166,6 +182,7 @@ class AdbPairingService : Service() {
     private val observer = Observer<Int> { port ->
         Log.i(TAG, "Pairing service port: $port")
         if (port <= 0) return@Observer
+        pairingPort.value = port
 
         mdnsTimeoutHandler.removeCallbacks(mdnsTimeoutRunnable)
         guideHandler.removeCallbacks(guideAdvanceRunnable)
@@ -202,6 +219,12 @@ class AdbPairingService : Service() {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 setSound(null, null)
+                // Vibration (without sound) materially improves the odds that
+                // ColorOS actually surfaces a heads-up banner for our otherwise
+                // silent foreground-service notification instead of filing it
+                // quietly into the shade.
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 200)
                 setShowBadge(false)
                 setAllowBubbles(false)
             }
@@ -217,13 +240,20 @@ class AdbPairingService : Service() {
                 onStepDone()
             }
             ACTION_REPLY -> {
-                val code = RemoteInput.getResultsFromIntent(intent)
-                    ?.getCharSequence(REMOTE_INPUT_KEY) ?: ""
+                val code = (RemoteInput.getResultsFromIntent(intent)
+                    ?.getCharSequence(REMOTE_INPUT_KEY) ?: "").toString().trim()
                 val port = intent.getIntExtra(EXTRA_PORT, -1)
-                if (port != -1) {
-                    onInput(code.toString(), port)
-                } else {
-                    onStart()
+                when (routeReply(code, port)) {
+                    ReplyRoute.EMPTY -> {
+                        // Empty submit — keep the current notification so the
+                        // user can try again.
+                        updateNotification()
+                        null
+                    }
+                    ReplyRoute.DIRECT -> onInput(code, port)
+                    // No port yet (process was likely frozen before mDNS could
+                    // discover it). Submitting un-froze us — discover now.
+                    ReplyRoute.DISCOVER -> onInputWithDiscovery(code)
                 }
             }
             ACTION_STOP -> {
@@ -278,6 +308,7 @@ class AdbPairingService : Service() {
         started = false
         mdnsTimeoutHandler.removeCallbacks(mdnsTimeoutRunnable)
         adbMdns?.stop()
+        pairingPort.value = 0
     }
 
     override fun onDestroy() {
@@ -335,36 +366,82 @@ class AdbPairingService : Service() {
 
     private fun onInput(code: String, port: Int): Notification {
         currentStep = GuideStep.PAIRING
+        serviceScope.launch { doPair(code, port) }
+        return buildStepNotification(GuideStep.PAIRING)
+    }
+
+    /**
+     * Reply path used when we don't yet have the pairing port — typically
+     * because aggressive OEM power management (ColorOS HansManager) froze our
+     * foreground process before the resident mDNS search could discover it.
+     *
+     * The act of submitting the RemoteInput un-freezes us, and by this point
+     * the user has opened the "pair with code" dialog in Settings (that's how
+     * they got the code), so the `_adb-tls-pairing._tcp` service is live.
+     * Discover the port once, right now, then pair immediately.
+     */
+    private fun onInputWithDiscovery(code: String): Notification {
+        currentStep = GuideStep.PAIRING
         serviceScope.launch {
-            val host = "127.0.0.1"
-
-            val key = try {
-                AdbKey(
-                    PreferenceAdbKeyStore(
-                        getSharedPreferences("adb_key", MODE_PRIVATE)
-                    ),
-                    "${packageName}@${Build.MODEL}"
-                )
-            } catch (e: Throwable) {
-                e.printStackTrace()
-                return@launch
-            }
-
-            AdbPairingClient(host, port, code, key).runCatching {
-                start()
-            }.onFailure {
-                handleResult(false, it)
-            }.onSuccess {
-                if (it) {
-                    // Pairing succeeded — now connect via DirectConnector flow
-                    connectAfterPairing(key)
-                } else {
-                    handleResult(false, null)
-                }
+            // Maybe the resident search already found it before we were frozen.
+            val known = pairingPort.value
+            val port = if (known > 0) known else discoverPairingPortOnce(PAIR_DISCOVERY_TIMEOUT_MS)
+            if (port == null || port <= 0) {
+                Log.w(TAG, "onInputWithDiscovery: pairing service not found within ${PAIR_DISCOVERY_TIMEOUT_MS}ms")
+                handleResult(false, IllegalStateException("pairing_service_not_found"))
+            } else {
+                Log.i(TAG, "onInputWithDiscovery: discovered port $port, pairing")
+                doPair(code, port)
             }
         }
-
         return buildStepNotification(GuideStep.PAIRING)
+    }
+
+    /** Perform the actual ADB pairing handshake and, on success, connect. */
+    private suspend fun doPair(code: String, port: Int) {
+        val host = "127.0.0.1"
+
+        val key = try {
+            AdbKey(
+                PreferenceAdbKeyStore(
+                    getSharedPreferences("adb_key", MODE_PRIVATE)
+                ),
+                "${packageName}@${Build.MODEL}"
+            )
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            handleResult(false, e)
+            return
+        }
+
+        AdbPairingClient(host, port, code, key).runCatching {
+            start()
+        }.onFailure {
+            handleResult(false, it)
+        }.onSuccess {
+            if (it) {
+                // Pairing succeeded — now connect via DirectConnector flow
+                connectAfterPairing(key)
+            } else {
+                handleResult(false, null)
+            }
+        }
+    }
+
+    /**
+     * One-shot mDNS discovery of the `_adb-tls-pairing._tcp` port.
+     * Returns the port, or null if not found within [timeoutMs].
+     */
+    private suspend fun discoverPairingPortOnce(timeoutMs: Long): Int? {
+        val deferred = CompletableDeferred<Int>()
+        val obs = Observer<Int> { p -> if (p > 0 && !deferred.isCompleted) deferred.complete(p) }
+        val mdns = AdbMdns(this, AdbMdns.TLS_PAIRING, obs)
+        return try {
+            mdns.start()
+            withTimeoutOrNull(timeoutMs) { deferred.await() }
+        } finally {
+            try { mdns.stop() } catch (_: Throwable) {}
+        }
     }
 
     /**
@@ -612,7 +689,9 @@ class AdbPairingService : Service() {
             .setContentText(getString(R.string.setup_wireless_notif_enter_desc))
             .setStyle(Notification.BigTextStyle()
                 .bigText(getString(R.string.setup_wireless_notif_enter_desc)))
+            .addAction(replyActionWithInput())
             .addAction(stopAction)
+            .setFullScreenIntent(fullScreenPendingIntent(), true)
             .setOngoing(true)
             .setOnlyAlertOnce(false)
             .build()
@@ -640,7 +719,9 @@ class AdbPairingService : Service() {
             .setContentText(getString(R.string.setup_wireless_notif_guide_desc, 6))
             .setStyle(Notification.BigTextStyle()
                 .bigText(getString(R.string.setup_wireless_notif_guide_desc, 6)))
+            .addAction(replyActionWithInput())
             .addAction(stopAction)
+            .setFullScreenIntent(fullScreenPendingIntent(), true)
             .setOngoing(true)
             .setOnlyAlertOnce(false)
             .build()
@@ -692,6 +773,7 @@ class AdbPairingService : Service() {
             .setStyle(Notification.BigTextStyle()
                 .bigText(getString(R.string.setup_pair_notif_desc, 6)))
             .setContentIntent(openPending)
+            .addAction(replyActionWithInput())
             .addAction(stopAction)
             .setOngoing(true)
             .setOnlyAlertOnce(silent)
@@ -756,11 +838,43 @@ class AdbPairingService : Service() {
 
     // ── CODE_INPUT notifications (RemoteInput / MIUI fallback) ────────
 
-    private fun createRemoteInputNotification(port: Int): Notification {
-        val remoteInput = RemoteInput.Builder(REMOTE_INPUT_KEY).run {
-            setLabel(getString(R.string.setup_pair_hint, 6))
-            build()
+    /**
+     * Build a "reply" action carrying a RemoteInput code field.
+     *
+     * [port] may be -1 when the port isn't known yet: we attach this action to
+     * the *guidance* notifications too, so that even if the process gets frozen
+     * before mDNS discovers the port, the user can still type the code. On
+     * submit with port<=0 we discover the port on the spot (see
+     * [onInputWithDiscovery]). FLAG_UPDATE_CURRENT means a later real-port
+     * action replaces this placeholder if the resident search succeeds first.
+     */
+    /**
+     * High-priority full-screen intent used purely to force the notification to
+     * surface as a heads-up banner (and break through ColorOS background-app
+     * suppression). It points at [SetupActivity] so that, in the event the OS
+     * does promote it to an actual full-screen launch, the user lands on the
+     * pairing UI rather than a dead end. The PendingIntent is held by SystemUI,
+     * so it still works even while our process is frozen.
+     */
+    private fun fullScreenPendingIntent(): PendingIntent {
+        val intent = Intent(this, SetupActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
+        return PendingIntent.getActivity(
+            this,
+            FULL_SCREEN_REQUEST_ID,
+            intent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            else
+                PendingIntent.FLAG_UPDATE_CURRENT
+        )
+    }
+
+    private fun replyActionWithInput(port: Int = -1): Notification.Action {
+        val remoteInput = RemoteInput.Builder(REMOTE_INPUT_KEY)
+            .setLabel(getString(R.string.setup_pair_hint, 6))
+            .build()
 
         val replyPending = PendingIntent.getForegroundService(
             this,
@@ -772,16 +886,20 @@ class AdbPairingService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val replyAction = Notification.Action.Builder(null, getString(R.string.setup_pair_btn), replyPending)
+        return Notification.Action.Builder(null, getString(R.string.setup_notif_input_btn), replyPending)
             .addRemoteInput(remoteInput)
             .build()
+    }
 
+    private fun createRemoteInputNotification(port: Int): Notification {
         return Notification.Builder(this, NOTIFICATION_CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle(getString(R.string.setup_pair_notif_title))
             .setContentText(getString(R.string.setup_pair_notif_desc, 6))
-            .addAction(replyAction)
+            .addAction(replyActionWithInput(port))
+            .setFullScreenIntent(fullScreenPendingIntent(), true)
             .setOngoing(true)
+            .setOnlyAlertOnce(false)
             .build()
     }
 
@@ -831,4 +949,29 @@ class AdbPairingService : Service() {
     override fun onBind(intent: Intent?): IBinder? {
         return null
     }
+}
+
+/** How a submitted RemoteInput pairing code should be routed. */
+internal enum class ReplyRoute {
+    /** No code entered — re-show the current notification. */
+    EMPTY,
+
+    /** Code entered and the pairing port is already known — pair directly. */
+    DIRECT,
+
+    /**
+     * Code entered but the port isn't known yet (e.g. our process was frozen
+     * before mDNS could discover it). Discover the port on the spot, then pair.
+     */
+    DISCOVER,
+}
+
+/**
+ * Pure decision for [AdbPairingService.onStartCommand]'s ACTION_REPLY handling,
+ * extracted so the freeze-resilient "discover on submit" branch is unit-testable.
+ */
+internal fun routeReply(code: String, port: Int): ReplyRoute = when {
+    code.isBlank() -> ReplyRoute.EMPTY
+    port > 0 -> ReplyRoute.DIRECT
+    else -> ReplyRoute.DISCOVER
 }

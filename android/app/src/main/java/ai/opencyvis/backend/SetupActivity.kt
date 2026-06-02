@@ -16,6 +16,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
@@ -50,11 +51,17 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var inputField: TextInputEditText
     private lateinit var actionButton: MaterialButton
     private lateinit var secondaryButton: MaterialButton
+    private lateinit var otpLabel: TextView
+    private lateinit var otpBox: OtpDigitBox
+    private lateinit var numberPad: NumberPadView
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentState = SetupState.CHOOSE_METHOD
     private var directConnector: DirectConnector? = null
+    private var privilegedService: IPrivilegedService? = null
     private var resumeAfterCreate = false
+    private var pairingPortJob: Job? = null
+    private var requestedBatteryExemption = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,9 +74,30 @@ class SetupActivity : AppCompatActivity() {
         inputField = findViewById(R.id.setup_input)
         actionButton = findViewById(R.id.setup_action_button)
         secondaryButton = findViewById(R.id.setup_secondary_button)
+        otpLabel = findViewById(R.id.setup_otp_label)
+        otpBox = findViewById(R.id.setup_otp_box)
+        numberPad = findViewById(R.id.setup_number_pad)
 
         actionButton.setOnClickListener { onActionClick() }
         secondaryButton.setOnClickListener { onSecondaryClick() }
+
+        otpBox.listener = object : OtpDigitBox.OnCodeCompleteListener {
+            override fun onCodeComplete(code: String) {
+                submitPairingCode(code)
+            }
+        }
+
+        // In-app number pad drives the OTP boxes so the system keyboard never appears.
+        // This keeps the Settings pairing code visible in split-screen (the system IME
+        // would otherwise rise from the bottom and cover the adjacent Settings window).
+        numberPad.onDigit = { digit -> otpBox.appendDigit(digit) }
+        numberPad.onBackspace = { otpBox.deleteDigit() }
+
+        // Persistent observer: mDNS discovers the pairing service port the moment the
+        // user opens "Pair device with pairing code" in Settings. That is the signal
+        // that the user is ready to type the code — auto-advance to the code-entry step
+        // (step 3) regardless of which pre-pairing step we're currently showing.
+        observePairingPort()
 
         val detected = SetupStateDetector.detect(this, false)
         Log.i("SetupActivity", "onCreate: detected=$detected taskId=$taskId")
@@ -101,6 +129,12 @@ class SetupActivity : AppCompatActivity() {
             resumeAfterCreate = false
             return
         }
+        // Guard: don't re-detect if user is mid-code-entry in split-screen
+        if (isInMultiWindowMode && currentState == SetupState.ADB_PAIR) {
+            Log.i("SetupActivity", "onResume: skipping detection in multi-window ADB_PAIR")
+            return
+        }
+
         val detected = SetupStateDetector.detect(this, false)
         Log.i("SetupActivity", "onResume: detected=$detected currentState=$currentState")
         val newState = when (detected) {
@@ -119,6 +153,14 @@ class SetupActivity : AppCompatActivity() {
         if (newState != currentState) updateUi(newState)
     }
 
+    override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
+        if (currentState == SetupState.ADB_PAIR) {
+            updateUi(SetupState.ADB_PAIR)
+        }
+        Log.i("SetupActivity", "onMultiWindowModeChanged: $isInMultiWindowMode")
+    }
+
     private fun updateUi(state: SetupState) {
         Log.i("SetupActivity", "updateUi: $state", Throwable("stack"))
         currentState = state
@@ -126,6 +168,13 @@ class SetupActivity : AppCompatActivity() {
         inputLayout.visibility = View.GONE
         secondaryButton.visibility = View.GONE
         actionButton.isEnabled = true
+        // Reset visibility for all states — ADB_PAIR handles them separately
+        titleView.visibility = View.VISIBLE
+        descView.visibility = View.VISIBLE
+        otpLabel.visibility = View.GONE
+        otpBox.visibility = View.GONE
+        numberPad.visibility = View.GONE
+        actionButton.visibility = View.VISIBLE
 
         when (state) {
             SetupState.CHOOSE_METHOD -> {
@@ -197,20 +246,49 @@ class SetupActivity : AppCompatActivity() {
             }
             SetupState.ADB_PAIR -> {
                 startPairingService()
-                titleView.text = getString(R.string.setup_pair_title)
-                descView.text = getString(R.string.setup_pair_desc, 6)
-                inputLayout.visibility = View.VISIBLE
-                inputLayout.hint = getString(R.string.setup_pair_hint, 6)
-                inputField.text?.clear()
-                actionButton.text = getString(R.string.setup_pair_btn)
-                secondaryButton.text = getString(R.string.setup_wireless_btn)
-                secondaryButton.visibility = View.VISIBLE
+                if (isInMultiWindowMode) {
+                    // Compact split-screen layout: OTP boxes + in-app number pad at top,
+                    // hide title/desc. The in-app number pad means the system keyboard
+                    // never appears, so the pairing code in the adjacent Settings window
+                    // stays visible.
+                    titleView.visibility = View.GONE
+                    descView.visibility = View.GONE
+                    otpLabel.visibility = View.VISIBLE
+                    otpLabel.text = pairLabelForCurrentPort()
+                    otpBox.visibility = View.VISIBLE
+                    otpBox.clear()
+                    otpBox.isEnabled = true
+                    numberPad.visibility = View.VISIBLE
+                    inputLayout.visibility = View.GONE
+                    // Submit via auto-submit on 6th digit, no button needed
+                    actionButton.visibility = View.GONE
+                    secondaryButton.text = getString(R.string.setup_wireless_btn)
+                    secondaryButton.visibility = View.VISIBLE
+                } else {
+                    // Full-screen layout: OTP boxes + in-app number pad (unified experience,
+                    // no system keyboard in either mode)
+                    titleView.text = getString(R.string.setup_pair_title)
+                    descView.text = getString(R.string.setup_pair_desc, 6)
+                    inputLayout.visibility = View.GONE // hide old single EditText
+                    otpLabel.visibility = View.VISIBLE
+                    otpLabel.text = pairLabelForCurrentPort()
+                    otpBox.visibility = View.VISIBLE
+                    otpBox.clear()
+                    otpBox.isEnabled = true
+                    numberPad.visibility = View.VISIBLE
+                    // Auto-submit on 6th digit; keep Pair button as a fallback
+                    actionButton.visibility = View.VISIBLE
+                    actionButton.text = getString(R.string.setup_pair_btn)
+                    secondaryButton.text = getString(R.string.setup_wireless_btn)
+                    secondaryButton.visibility = View.VISIBLE
+                }
             }
             SetupState.CONNECTING -> {
                 titleView.text = "Connecting..."
                 descView.text = "Establishing connection to the privileged service."
                 progressBar.visibility = View.VISIBLE
                 actionButton.isEnabled = false
+                otpBox.isEnabled = false
             }
             SetupState.CONNECTED -> {
                 titleView.text = getString(R.string.setup_success_title)
@@ -219,11 +297,15 @@ class SetupActivity : AppCompatActivity() {
                     descView.append("\n\n" + getString(R.string.setup_coloros_auto_close))
                 }
                 actionButton.text = getString(R.string.setup_done_btn)
+                otpBox.visibility = View.GONE
+                otpLabel.visibility = View.GONE
             }
             SetupState.FAILED -> {
                 titleView.text = getString(R.string.setup_error_wrong_code)
                 descView.text = getString(R.string.setup_error_connect_fail)
                 actionButton.text = getString(R.string.setup_action_retry)
+                otpBox.visibility = View.GONE
+                otpLabel.visibility = View.GONE
             }
         }
     }
@@ -249,17 +331,18 @@ class SetupActivity : AppCompatActivity() {
                 openWirelessDebuggingSettings()
             }
             SetupState.ADB_PAIR -> {
-                val code = inputField.text?.toString()
-                if (code.isNullOrBlank() || code.length < 6) {
-                    inputLayout.error = "Enter a 6-digit code"
+                val code = otpBox.getCode()
+                if (code.length < 6) {
+                    otpBox.clear()
+                    Toast.makeText(this, getString(R.string.setup_error_wrong_code), Toast.LENGTH_SHORT).show()
                 } else {
-                    inputLayout.error = null
                     submitPairingCode(code)
                 }
             }
             SetupState.CONNECTING -> {} // wait
             SetupState.CONNECTED -> {
                 setResult(RESULT_BACKEND_READY)
+                exitSplitScreenIfNeeded()
                 finish()
             }
             SetupState.FAILED -> updateUi(SetupState.CHOOSE_METHOD)
@@ -285,15 +368,74 @@ class SetupActivity : AppCompatActivity() {
         // Trigger heads-up notification to guide user while in Settings
         startService(AdbPairingService.alertIntent(this))
 
-        val wirelessIntent = Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS")
-        if (wirelessIntent.resolveActivity(packageManager) != null) {
-            startActivity(wirelessIntent)
-        } else {
-            startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+        // Candidate Settings destinations, most specific first. Chinese OEM ROMs (nubia,
+        // MIUI, ColorOS, ...) often lack the wireless-debugging deep link, keep the
+        // developer-settings activity unexported, or don't honor it via an implicit
+        // action — so we fall through to the always-available main Settings page.
+        val candidates = listOf(
+            Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS"),
+            Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
                 putExtra(":settings:show_fragment_args", Bundle().apply {
                     putString(":settings:fragment_args_key", "toggle_adb_wireless")
                 })
-            })
+            },
+            Intent(android.provider.Settings.ACTION_SETTINGS)
+        )
+
+        // On API 32+ (Android 12L+), request adjacent split-screen placement. OEMs that
+        // don't support split just open the target fullscreen — harmless degradation.
+        val flags = if (Build.VERSION.SDK_INT >= 32) {
+            Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT or
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+        } else {
+            Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+        for (intent in candidates) {
+            intent.addFlags(flags)
+            try {
+                startActivity(intent)
+                Log.i("SetupActivity", "Opened settings via action=${intent.action}")
+                return
+            } catch (e: Exception) {
+                Log.w("SetupActivity", "settings intent action=${intent.action} failed: ${e.message}")
+            }
+        }
+        Toast.makeText(this, getString(R.string.setup_open_settings_manual), Toast.LENGTH_LONG).show()
+    }
+
+    /** OTP label text reflecting the latest mDNS-discovered pairing port, if any. */
+    private fun pairLabelForCurrentPort(): String {
+        val port = AdbPairingService.pairingPort.value
+        return if (port > 0) {
+            getString(R.string.setup_pair_split_label_with_port, port)
+        } else {
+            getString(R.string.setup_pair_split_label)
+        }
+    }
+
+    private fun observePairingPort() {
+        pairingPortJob?.cancel()
+        pairingPortJob = scope.launch {
+            AdbPairingService.pairingPort.collect { port ->
+                if (port <= 0) return@collect
+                when (currentState) {
+                    // Discovering the mDNS pairing port means the user just opened
+                    // "Pair device with pairing code" in Settings → auto-advance to the
+                    // code-entry step (step 3) so the OTP boxes + number pad are ready.
+                    SetupState.ADB_CHECK_OS,
+                    SetupState.ADB_ENABLE_DEV,
+                    SetupState.ADB_ENABLE_WIRELESS -> {
+                        updateUi(SetupState.ADB_PAIR)
+                    }
+                    SetupState.ADB_PAIR -> {
+                        otpLabel.text = getString(R.string.setup_pair_split_label_with_port, port)
+                    }
+                    // Connecting / connected / failed / shizuku — don't disrupt.
+                    else -> {}
+                }
+            }
         }
     }
 
@@ -354,6 +496,50 @@ class SetupActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Register the freshly-connected privileged backend with AgentService so the rest
+     * of the app sees a live connection. Without this, ControlPanel.onResume() finds
+     * activeBackendName == "none" after we finish and re-launches setup / re-runs the
+     * reconnect flow. Mirrors AdbPairingService.connectAfterPairing().
+     */
+    private fun registerConnectedBackend(connector: DirectConnector, binder: android.os.IBinder) {
+        try {
+            val svc = IPrivilegedService.Stub.asInterface(binder)
+            privilegedService = svc
+            val backend = RemoteBackend(connector, svc)
+            ai.opencyvis.capture.ScreenCapture.backend = backend
+            ai.opencyvis.App.agentService?.updateBackend(backend)
+            Log.i("SetupActivity", "Backend registered with AgentService after pairing")
+        } catch (e: Exception) {
+            Log.e("SetupActivity", "Failed to register backend after pairing", e)
+        }
+    }
+
+    /**
+     * Dismiss split-screen when finishing setup so the user lands on a fullscreen app.
+     *
+     * There is no public API to force a standard-signed app out of split-screen on
+     * Android 12+ (relaunching via the launcher intent stays in the same pane, and
+     * ActivityOptions.setLaunchWindowingMode is blocked by the hidden-API allowlist).
+     * Instead we force-stop the adjacent Settings pane via the now-connected privileged
+     * service (shell uid): killing one pane collapses split-screen and the remaining
+     * pane (our app) becomes fullscreen. Verified on Pixel 6 Pro (API 35).
+     *
+     * Runs on a detached thread because the binder call blocks (am force-stop) and the
+     * activity's own scope is cancelled by finish().
+     */
+    private fun exitSplitScreenIfNeeded() {
+        if (!isInMultiWindowMode) return
+        val svc = privilegedService ?: return
+        Thread {
+            try {
+                svc.forceStopPackage("com.android.settings")
+            } catch (e: Exception) {
+                Log.w("SetupActivity", "exitSplitScreen force-stop failed: ${e.message}")
+            }
+        }.start()
+    }
+
     private fun submitPairingCode(code: String) {
         updateUi(SetupState.CONNECTING)
         scope.launch {
@@ -373,6 +559,7 @@ class SetupActivity : AppCompatActivity() {
             }
 
             if (pairingState is ConnectionState.Connected) {
+                registerConnectedBackend(connector, pairingState.serviceBinder)
                 updateUi(SetupState.CONNECTED)
                 return@launch
             }
@@ -391,6 +578,7 @@ class SetupActivity : AppCompatActivity() {
                 }
             }
             if (result is ConnectionState.Connected) {
+                registerConnectedBackend(connector, result.serviceBinder)
                 updateUi(SetupState.CONNECTED)
             } else {
                 val error = (result as? ConnectionState.Failed)?.error ?: "Timed out"
@@ -409,6 +597,8 @@ class SetupActivity : AppCompatActivity() {
         actionButton.isEnabled = false
         inputLayout.visibility = View.GONE
         secondaryButton.visibility = View.GONE
+        otpLabel.visibility = View.GONE
+        otpBox.visibility = View.GONE
 
         if (service == null) {
             Log.i("SetupActivity", "No AgentService, showing pairing UI")
@@ -435,8 +625,35 @@ class SetupActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Ask the user to exempt us from battery optimization before they leave for
+     * Settings. On aggressive OEM ROMs (e.g. ColorOS HansManager) a backgrounded
+     * foreground service still gets frozen ~6s after losing foreground, which
+     * kills the mDNS discovery mid-pairing. Being on the Doze allow-list reduces
+     * (though on ColorOS doesn't fully eliminate) that freezing. Best-effort,
+     * one-shot per Activity instance — the real safety net is the discover-on-submit
+     * path in AdbPairingService.
+     */
+    private fun ensureBackgroundAllowed() {
+        if (requestedBatteryExemption) return
+        val pm = getSystemService(android.os.PowerManager::class.java) ?: return
+        if (pm.isIgnoringBatteryOptimizations(packageName)) return
+        requestedBatteryExemption = true
+        try {
+            startActivity(
+                Intent(
+                    android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    android.net.Uri.parse("package:$packageName")
+                )
+            )
+        } catch (e: Exception) {
+            Log.w("SetupActivity", "battery-optimization request unavailable: ${e.message}")
+        }
+    }
+
     private fun startPairingService() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        ensureBackgroundAllowed()
         val intent = AdbPairingService.startIntent(this)
         try {
             startForegroundService(intent)
@@ -451,6 +668,7 @@ class SetupActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         scope.cancel()
+        pairingPortJob?.cancel()
         super.onDestroy()
     }
 }
