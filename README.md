@@ -88,6 +88,11 @@ For most users. No custom ROM, no root, no computer.
 
 The entire pairing process completes on-device. Supports Android 11+.
 
+> **Pairing tips**
+> - The wizard sends you to **Wireless debugging → Pair device with pairing code**. Once you see the 6-digit code, **pull down the notification shade** and type the code straight into the OpenCyvis notification — no need to switch back to the app.
+> - Some vendor ROMs (ColorOS / OnePlus, MIUI, …) freeze apps once they go to the background. If the system asks you to **allow background activity / ignore battery optimization** during pairing, choose **Allow** for a smoother experience.
+> - If you don't see the notification with the input field, just pull down the shade once to find it.
+
 ### System App Mode
 
 For developers and power users.
@@ -223,7 +228,7 @@ Two APKs are available on the [Releases](https://github.com/opencyvis/opencyvis-
 3. Configure your LLM provider in Settings
 4. Start sending tasks
 
-No root, no computer, no custom ROM required.
+No root, no computer, no custom ROM required. During pairing, type the 6-digit code into the OpenCyvis notification (pull down the shade), and allow background activity if your ROM prompts for it.
 
 ### System App Mode
 
