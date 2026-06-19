@@ -90,6 +90,8 @@ object ConfigDeepLink {
             ConfigRepository.DEFAULT_ANTHROPIC_MODEL to ConfigRepository.DEFAULT_ANTHROPIC_BASE_URL
         ConfigRepository.PROVIDER_OLLAMA ->
             ConfigRepository.DEFAULT_OLLAMA_MODEL to ConfigRepository.DEFAULT_OLLAMA_BASE_URL
+        ConfigRepository.PROVIDER_KIMI ->
+            ConfigRepository.DEFAULT_KIMI_MODEL to ConfigRepository.DEFAULT_KIMI_BASE_URL
         else -> ConfigRepository.DEFAULT_MODEL to ConfigRepository.DEFAULT_BASE_URL
     }
 
@@ -99,6 +101,7 @@ object ConfigDeepLink {
     private val supportedProviders = setOf(
         ConfigRepository.PROVIDER_OPENAI,
         ConfigRepository.PROVIDER_ANTHROPIC,
-        ConfigRepository.PROVIDER_OLLAMA
+        ConfigRepository.PROVIDER_OLLAMA,
+        ConfigRepository.PROVIDER_KIMI
     )
 }

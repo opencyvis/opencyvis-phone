@@ -342,6 +342,10 @@ class AgentService : Service() {
         releaseAgentWakeLock()
 
         Log.i(TAG, "startAgent config: provider=${config.apiProvider} model=${config.model} baseUrl=${config.baseUrl} key=${config.apiKey.take(10)}...")
+        val llmTemperature = when (config.apiProvider) {
+            ConfigRepository.PROVIDER_KIMI -> 0.6
+            else -> 0.1
+        }
         val llmClient: LLMClientInterface = when (config.apiProvider) {
             ConfigRepository.PROVIDER_ANTHROPIC -> AnthropicClient(
                 apiKey = config.apiKey,
@@ -355,7 +359,9 @@ class AgentService : Service() {
             else -> LLMClient(
                 apiKey = config.apiKey,
                 model = config.model,
-                baseUrl = config.baseUrl
+                baseUrl = config.baseUrl,
+                temperature = llmTemperature,
+                disableThinking = config.apiProvider == ConfigRepository.PROVIDER_KIMI
             )
         }
 

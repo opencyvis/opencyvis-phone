@@ -23,14 +23,16 @@ import java.util.concurrent.TimeUnit
 class LLMClient(
     private val apiKey: String,
     private val model: String,
-    private val baseUrl: String
+    private val baseUrl: String,
+    private val temperature: Double = DEFAULT_TEMPERATURE,
+    private val disableThinking: Boolean = false
 ) : LLMClientInterface {
 
     companion object {
         private const val TAG = "LLMClient"
         private const val MAX_RETRIES = 6
         private const val MAX_OUTPUT_TOKENS = 1024
-        private const val TEMPERATURE = 0.1
+        private const val DEFAULT_TEMPERATURE = 0.1
         private const val CONNECT_TIMEOUT_MS = 30_000L
         private const val READ_TIMEOUT_MS = 90_000L  // longer for streaming
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
@@ -63,10 +65,12 @@ class LLMClient(
                         put("model", model)
                         put("messages", messagesArray)
                         put("max_tokens", maxTokens)
-                        put("temperature", TEMPERATURE)
+                        put("temperature", temperature)
                         put("tools", ToolSchema.toolsArray())
                         put("tool_choice", "required")
-                        if (model.contains("qwen3") || model.contains("qwq")) {
+                        if (disableThinking) {
+                            put("thinking", JSONObject().put("type", "disabled"))
+                        } else if (model.contains("qwen3") || model.contains("qwq")) {
                             put("enable_thinking", false)
                         }
                         put("stream", true)

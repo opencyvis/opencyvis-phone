@@ -29,20 +29,23 @@ class ConfigRepository(context: Context) {
         const val PROVIDER_OPENAI = "openai"
         const val PROVIDER_ANTHROPIC = "anthropic"
         const val PROVIDER_OLLAMA = "ollama"
+        const val PROVIDER_KIMI = "kimi"
         const val DEFAULT_MODEL = "gpt-5.5"
         const val DEFAULT_BASE_URL = "https://api.openai.com/v1"
         const val DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-7-20250415"
         const val DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com"
         const val DEFAULT_OLLAMA_MODEL = "gemma4:26b-a4b-it-q4_K_M"
         const val DEFAULT_OLLAMA_BASE_URL = "https://localhost:11434"
+        const val DEFAULT_KIMI_MODEL = "kimi-k2.6"
+        const val DEFAULT_KIMI_BASE_URL = "https://api.moonshot.cn/v1"
         const val DEFAULT_MAX_STEPS = 100
 
         /** Returns true if model or url matches any known provider default.
          *  SettingsActivity uses this to decide whether to auto-fill defaults when
          *  the provider spinner changes. */
         fun isDefaultModelOrUrl(model: String, url: String): Boolean =
-            model in listOf(DEFAULT_MODEL, DEFAULT_ANTHROPIC_MODEL, DEFAULT_OLLAMA_MODEL) ||
-            url in listOf(DEFAULT_BASE_URL, DEFAULT_ANTHROPIC_BASE_URL, DEFAULT_OLLAMA_BASE_URL)
+            model in listOf(DEFAULT_MODEL, DEFAULT_ANTHROPIC_MODEL, DEFAULT_OLLAMA_MODEL, DEFAULT_KIMI_MODEL) ||
+            url in listOf(DEFAULT_BASE_URL, DEFAULT_ANTHROPIC_BASE_URL, DEFAULT_OLLAMA_BASE_URL, DEFAULT_KIMI_BASE_URL)
     }
 
     private val prefs: SharedPreferences =

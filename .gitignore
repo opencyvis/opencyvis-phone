@@ -13,3 +13,4 @@ android/app/libs/framework-stubs.jar
 .superpowers/
 android/app/.cxx/
 android/build/
+.idea/

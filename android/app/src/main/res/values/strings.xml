@@ -27,11 +27,13 @@
         <item>OpenAI Compatible</item>
         <item>Anthropic</item>
         <item>Ollama (Local)</item>
+        <item>Kimi</item>
     </string-array>
     <string-array name="api_provider_values">
         <item>openai</item>
         <item>anthropic</item>
         <item>ollama</item>
+        <item>kimi</item>
     </string-array>
 
     <!-- Control panel -->
