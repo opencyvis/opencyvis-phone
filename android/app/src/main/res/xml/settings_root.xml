@@ -220,7 +220,7 @@
         <Preference
             android:key="backend_status"
             android:title="Active Backend"
-            android:selectable="false"
+            android:selectable="true"
             android:summary="Detecting..." />
 
         <Preference

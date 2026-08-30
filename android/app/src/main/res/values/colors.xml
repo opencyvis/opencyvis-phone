@@ -31,6 +31,9 @@
     <color name="text_cycle">#64748B</color>
     <color name="text_on_bubble_user">#F0FFFFFF</color>
 
+    <!-- Dialog actions -->
+    <color name="dialog_action">#7A5B00</color>
+
     <!-- Brand / Semantic colors (same in both themes) -->
     <color name="color_accent">#FFCBA135</color>
     <color name="color_success">#4ADE80</color>

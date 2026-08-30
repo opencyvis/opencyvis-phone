@@ -12,10 +12,30 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import rikka.shizuku.Shizuku
 
+enum class ShizukuStatus {
+    UNAVAILABLE,
+    PERMISSION_REQUIRED,
+    READY
+}
+
 class ShizukuConnector(private val context: Context) : ServiceConnector {
 
     companion object {
         private const val TAG = "ShizukuConnector"
+
+        fun status(): ShizukuStatus {
+            return try {
+                if (!Shizuku.pingBinder()) {
+                    ShizukuStatus.UNAVAILABLE
+                } else if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+                    ShizukuStatus.READY
+                } else {
+                    ShizukuStatus.PERMISSION_REQUIRED
+                }
+            } catch (_: Exception) {
+                ShizukuStatus.UNAVAILABLE
+            }
+        }
     }
 
     override val name = "shizuku"
@@ -26,6 +46,7 @@ class ShizukuConnector(private val context: Context) : ServiceConnector {
     private var reconnectAttempt = 0
     private val reconnectDelays = longArrayOf(2000, 4000, 8000, 15000, 30000)
     private var userServiceArgs: Shizuku.UserServiceArgs? = null
+    private var connectedBinder: IBinder? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -33,8 +54,14 @@ class ShizukuConnector(private val context: Context) : ServiceConnector {
                 _state.value = ConnectionState.Failed("null binder")
                 return
             }
+            if (connectedBinder === binder && _state.value is ConnectionState.Connected) {
+                Log.d(TAG, "Ignoring duplicate onServiceConnected callback")
+                return
+            }
+            connectedBinder = binder
             binder.linkToDeath({
                 Log.w(TAG, "Remote process died")
+                connectedBinder = null
                 _state.value = ConnectionState.Disconnected
                 scheduleReconnect()
             }, 0)
@@ -45,6 +72,7 @@ class ShizukuConnector(private val context: Context) : ServiceConnector {
 
         override fun onServiceDisconnected(name: ComponentName?) {
             Log.w(TAG, "Disconnected — scheduling reconnect")
+            connectedBinder = null
             _state.value = ConnectionState.Disconnected
             scheduleReconnect()
         }
@@ -62,12 +90,14 @@ class ShizukuConnector(private val context: Context) : ServiceConnector {
     }
 
     override fun isAvailable(): Boolean {
-        return try {
-            Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        } catch (_: Exception) { false }
+        return status() == ShizukuStatus.READY
     }
 
     override fun connect() {
+        if (!isAvailable()) {
+            _state.value = ConnectionState.Failed("Shizuku is unavailable or permission is not granted")
+            return
+        }
         _state.value = ConnectionState.Connecting
         try {
             val args = Shizuku.UserServiceArgs(
@@ -88,6 +118,7 @@ class ShizukuConnector(private val context: Context) : ServiceConnector {
                 Shizuku.unbindUserService(args, serviceConnection, false)
             }
         } catch (_: Exception) {}
+        connectedBinder = null
         _state.value = ConnectionState.Disconnected
     }
 }

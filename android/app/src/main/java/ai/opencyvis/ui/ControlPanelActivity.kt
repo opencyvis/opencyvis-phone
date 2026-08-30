@@ -814,9 +814,12 @@ class ControlPanelActivity : AppCompatActivity() {
         if (service != null) {
             val backendName = service.activeBackendName
             if (backendName == null || backendName == "none") {
-                if (ai.opencyvis.backend.SetupStateDetector.isWirelessDebuggingEnabled(this)) {
+                val shizukuPresent =
+                    ai.opencyvis.backend.ShizukuConnector.status() !=
+                        ai.opencyvis.backend.ShizukuStatus.UNAVAILABLE
+                if (shizukuPresent || ai.opencyvis.backend.SetupStateDetector.isWirelessDebuggingEnabled(this)) {
                     scope.launch {
-                        Log.i(TAG, "No backend but wireless debugging is on, retrying...")
+                        Log.i(TAG, "A privilege backend is available, retrying detection...")
                         val success = service.retryBackendDetection()
                         if (success) {
                             Log.i(TAG, "Backend reconnected on resume")
