@@ -28,4 +28,7 @@
     <color name="text_countdown">#9CC7FF</color>
     <color name="text_cycle">#94A3B8</color>
     <color name="text_on_bubble_user">#F0FFFFFF</color>
+
+    <!-- Dialog actions -->
+    <color name="dialog_action">#E8BE4D</color>
 </resources>
