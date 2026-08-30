@@ -23,8 +23,13 @@ object BackendDetector {
             return DetectionResult.Ready(SystemBackend())
         }
 
-        // Try connectors in priority order
+        // Shizuku is the preferred standard-app backend. A running Shizuku that has
+        // not been authorized yet must lead to the permission UI, not wireless ADB.
         val connectors = buildConnectorList(context)
+        if (ShizukuConnector.status() == ShizukuStatus.PERMISSION_REQUIRED) {
+            Log.i(TAG, "Shizuku is running and needs app permission")
+            return DetectionResult.SetupRequired(connectors)
+        }
 
         for (connector in connectors) {
             if (!connector.isAvailable()) continue

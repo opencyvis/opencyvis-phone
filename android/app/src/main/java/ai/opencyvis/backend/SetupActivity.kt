@@ -28,6 +28,8 @@ class SetupActivity : AppCompatActivity() {
 
     companion object {
         const val RESULT_BACKEND_READY = 100
+        const val EXTRA_FORCE_METHOD_CHOOSER = "force_method_chooser"
+        private const val SHIZUKU_PERMISSION_REQUEST_CODE = 41
     }
 
     private enum class SetupState {
@@ -61,7 +63,33 @@ class SetupActivity : AppCompatActivity() {
     private var privilegedService: IPrivilegedService? = null
     private var resumeAfterCreate = false
     private var pairingPortJob: Job? = null
+    private var shizukuConnectJob: Job? = null
     private var requestedBatteryExemption = false
+    private var preferWirelessAdb = false
+    private var forceMethodChooser = false
+
+    private val shizukuBinderReceivedListener = rikka.shizuku.Shizuku.OnBinderReceivedListener {
+        if (!forceMethodChooser &&
+            !preferWirelessAdb &&
+            currentState != SetupState.SHIZUKU_CHECK &&
+            currentState != SetupState.CONNECTING &&
+            currentState != SetupState.ADB_PAIR &&
+            currentState != SetupState.CONNECTED
+        ) {
+            startPreferredSetupFlow()
+        }
+    }
+
+    private val shizukuPermissionResultListener =
+        rikka.shizuku.Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode != SHIZUKU_PERMISSION_REQUEST_CODE) return@OnRequestPermissionResultListener
+            if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                forceMethodChooser = false
+                updateUi(SetupState.SHIZUKU_CHECK)
+            } else {
+                showShizukuPermissionDenied()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,12 +121,38 @@ class SetupActivity : AppCompatActivity() {
         numberPad.onDigit = { digit -> otpBox.appendDigit(digit) }
         numberPad.onBackspace = { otpBox.deleteDigit() }
 
+        rikka.shizuku.Shizuku.addBinderReceivedListener(shizukuBinderReceivedListener)
+        rikka.shizuku.Shizuku.addRequestPermissionResultListener(shizukuPermissionResultListener)
+
         // Persistent observer: mDNS discovers the pairing service port the moment the
         // user opens "Pair device with pairing code" in Settings. That is the signal
         // that the user is ready to type the code — auto-advance to the code-entry step
         // (step 3) regardless of which pre-pairing step we're currently showing.
         observePairingPort()
 
+        forceMethodChooser = intent.getBooleanExtra(EXTRA_FORCE_METHOD_CHOOSER, false)
+        if (forceMethodChooser) {
+            updateUi(SetupState.CHOOSE_METHOD)
+        } else {
+            startPreferredSetupFlow()
+        }
+        resumeAfterCreate = true
+    }
+
+    /** Prefer a running Shizuku before evaluating any wireless ADB prerequisites. */
+    private fun startPreferredSetupFlow() {
+        if (preferWirelessAdb) {
+            startAdbSetupFlow()
+            return
+        }
+        when (ShizukuConnector.status()) {
+            ShizukuStatus.READY -> updateUi(SetupState.SHIZUKU_CHECK)
+            ShizukuStatus.PERMISSION_REQUIRED -> updateUi(SetupState.SHIZUKU_PERMISSION)
+            ShizukuStatus.UNAVAILABLE -> startAdbSetupFlow()
+        }
+    }
+
+    private fun startAdbSetupFlow() {
         val detected = SetupStateDetector.detect(this, false)
         Log.i("SetupActivity", "onCreate: detected=$detected taskId=$taskId")
         val startState = when (detected) {
@@ -119,7 +173,6 @@ class SetupActivity : AppCompatActivity() {
         }
         Log.i("SetupActivity", "onCreate: startState=$startState")
         updateUi(startState)
-        resumeAfterCreate = true
     }
 
     override fun onResume() {
@@ -132,6 +185,13 @@ class SetupActivity : AppCompatActivity() {
         // Guard: don't re-detect if user is mid-code-entry in split-screen
         if (isInMultiWindowMode && currentState == SetupState.ADB_PAIR) {
             Log.i("SetupActivity", "onResume: skipping detection in multi-window ADB_PAIR")
+            return
+        }
+
+        if (forceMethodChooser && currentState == SetupState.CHOOSE_METHOD) return
+
+        if (!preferWirelessAdb && ShizukuConnector.status() != ShizukuStatus.UNAVAILABLE) {
+            startPreferredSetupFlow()
             return
         }
 
@@ -178,24 +238,18 @@ class SetupActivity : AppCompatActivity() {
 
         when (state) {
             SetupState.CHOOSE_METHOD -> {
-                // Check if Shizuku is installed — if so, offer it as secondary option
-                val shizukuAvailable = try {
-                    ShizukuConnector(this).isAvailable()
-                } catch (_: Exception) { false }
-
-                if (shizukuAvailable) {
+                val shizukuStatus = ShizukuConnector.status()
+                if (shizukuStatus != ShizukuStatus.UNAVAILABLE) {
                     // Shizuku detected — offer both options
-                    titleView.text = "Setup"
-                    descView.text = "OpenCyvis needs permissions to control the device.\n\n" +
-                        "Shizuku is detected on your device — you can use it for a quick setup, " +
-                        "or use the built-in Wireless ADB method (no extra apps needed)."
+                    titleView.text = "Choose Backend"
+                    descView.text = "Shizuku is available. Choose which privilege backend OpenCyvis should use."
                     actionButton.text = "Use Shizuku"
                     secondaryButton.text = "Use Wireless ADB"
                     secondaryButton.visibility = View.VISIBLE
                 } else {
-                    // No Shizuku — go directly to wireless ADB flow
-                    updateUi(SetupState.ADB_CHECK_OS)
-                    return
+                    titleView.text = "Choose Backend"
+                    descView.text = "Shizuku is not running. Wireless ADB is the available standard-app backend."
+                    actionButton.text = "Use Wireless ADB"
                 }
             }
             SetupState.NEED_WIFI -> {
@@ -215,6 +269,8 @@ class SetupActivity : AppCompatActivity() {
                 titleView.text = "Shizuku Permission"
                 descView.text = "Shizuku is running. Grant permission to OpenCyvis to continue."
                 actionButton.text = "Grant Permission"
+                secondaryButton.text = "Use Wireless ADB"
+                secondaryButton.visibility = View.VISIBLE
             }
             SetupState.ADB_CHECK_OS -> {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
@@ -312,7 +368,17 @@ class SetupActivity : AppCompatActivity() {
 
     private fun onActionClick() {
         when (currentState) {
-            SetupState.CHOOSE_METHOD -> updateUi(SetupState.SHIZUKU_CHECK)
+            SetupState.CHOOSE_METHOD -> {
+                forceMethodChooser = false
+                when (ShizukuConnector.status()) {
+                    ShizukuStatus.READY -> updateUi(SetupState.SHIZUKU_CHECK)
+                    ShizukuStatus.PERMISSION_REQUIRED -> updateUi(SetupState.SHIZUKU_PERMISSION)
+                    ShizukuStatus.UNAVAILABLE -> {
+                        preferWirelessAdb = true
+                        startAdbSetupFlow()
+                    }
+                }
+            }
             SetupState.NEED_WIFI -> {
                 // Re-check WiFi
                 if (SetupStateDetector.hasWifi(this)) {
@@ -351,7 +417,15 @@ class SetupActivity : AppCompatActivity() {
 
     private fun onSecondaryClick() {
         when (currentState) {
-            SetupState.CHOOSE_METHOD -> updateUi(SetupState.ADB_CHECK_OS)
+            SetupState.CHOOSE_METHOD -> {
+                forceMethodChooser = false
+                preferWirelessAdb = true
+                updateUi(SetupState.ADB_CHECK_OS)
+            }
+            SetupState.SHIZUKU_PERMISSION -> {
+                preferWirelessAdb = true
+                startAdbSetupFlow()
+            }
             SetupState.ADB_ENABLE_DEV -> updateUi(SetupState.ADB_ENABLE_WIRELESS)
             SetupState.ADB_ENABLE_WIRELESS -> {
                 // "Enter Code Manually"
@@ -440,7 +514,8 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun checkShizuku() {
-        scope.launch {
+        if (shizukuConnectJob?.isActive == true) return
+        shizukuConnectJob = scope.launch {
             try {
                 val connector = ShizukuConnector(this@SetupActivity)
                 if (connector.isAvailable()) {
@@ -452,6 +527,7 @@ class SetupActivity : AppCompatActivity() {
                         }
                     }
                     if (result is ConnectionState.Connected) {
+                        registerConnectedBackend(connector, result.serviceBinder)
                         updateUi(SetupState.CONNECTED)
                     } else {
                         updateUi(SetupState.FAILED)
@@ -465,35 +541,29 @@ class SetupActivity : AppCompatActivity() {
                     if (shizukuRunning) {
                         updateUi(SetupState.SHIZUKU_PERMISSION)
                     } else {
-                        descView.text = "Shizuku is not installed or not running.\n\n" +
-                            "Install Shizuku from the Play Store and start it, then try again.\n\n" +
-                            "Or use Wireless ADB instead."
-                        actionButton.text = "Retry"
-                        actionButton.isEnabled = true
-                        secondaryButton.text = "Use Wireless ADB"
-                        secondaryButton.visibility = View.VISIBLE
-                        secondaryButton.setOnClickListener { updateUi(SetupState.ADB_CHECK_OS) }
+                        startAdbSetupFlow()
                     }
                 }
             } catch (e: Exception) {
+                updateUi(SetupState.FAILED)
                 descView.text = "Error checking Shizuku: ${e.message}"
-                actionButton.text = "Retry"
-                actionButton.isEnabled = true
+            } finally {
+                shizukuConnectJob = null
             }
         }
     }
 
     private fun requestShizukuPermission() {
         try {
-            rikka.shizuku.Shizuku.requestPermission(0)
-            // Permission result is async -- re-check after a delay
-            scope.launch {
-                kotlinx.coroutines.delay(2000)
-                checkShizuku()
-            }
+            rikka.shizuku.Shizuku.requestPermission(SHIZUKU_PERMISSION_REQUEST_CODE)
         } catch (e: Exception) {
             Toast.makeText(this, "Failed to request permission: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun showShizukuPermissionDenied() {
+        updateUi(SetupState.SHIZUKU_PERMISSION)
+        descView.text = "Shizuku permission was denied. Grant permission to use Shizuku, or continue with Wireless ADB."
     }
 
     /**
@@ -502,14 +572,14 @@ class SetupActivity : AppCompatActivity() {
      * activeBackendName == "none" after we finish and re-launches setup / re-runs the
      * reconnect flow. Mirrors AdbPairingService.connectAfterPairing().
      */
-    private fun registerConnectedBackend(connector: DirectConnector, binder: android.os.IBinder) {
+    private fun registerConnectedBackend(connector: ServiceConnector, binder: android.os.IBinder) {
         try {
             val svc = IPrivilegedService.Stub.asInterface(binder)
             privilegedService = svc
             val backend = RemoteBackend(connector, svc)
             ai.opencyvis.capture.ScreenCapture.backend = backend
             ai.opencyvis.App.agentService?.updateBackend(backend)
-            Log.i("SetupActivity", "Backend registered with AgentService after pairing")
+            Log.i("SetupActivity", "Backend registered with AgentService via ${connector.name}")
         } catch (e: Exception) {
             Log.e("SetupActivity", "Failed to register backend after pairing", e)
         }
@@ -667,8 +737,11 @@ class SetupActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        rikka.shizuku.Shizuku.removeBinderReceivedListener(shizukuBinderReceivedListener)
+        rikka.shizuku.Shizuku.removeRequestPermissionResultListener(shizukuPermissionResultListener)
         scope.cancel()
         pairingPortJob?.cancel()
+        shizukuConnectJob?.cancel()
         super.onDestroy()
     }
 }

@@ -719,8 +719,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val backendName = App.agentService?.activeBackendName
         statusPref.summary = when (backendName) {
             "system"     -> "System App (full capabilities)"
-            "shizuku"    -> "Shizuku (shell permissions)"
-            "adb-direct" -> "ADB Direct (shell permissions)"
+            "shizuku"    -> "Shizuku — tap to change"
+            "adb-direct" -> "ADB Direct — tap to change"
             null, "none" -> "Not connected — tap to set up"
             else         -> backendName
         }
@@ -735,10 +735,19 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         statusPref.setOnPreferenceClickListener {
             val name = App.agentService?.activeBackendName
-            if (name == null || name == "none") {
-                startActivity(android.content.Intent(requireContext(),
-                    ai.opencyvis.backend.SetupActivity::class.java))
+            if (name == "system") {
+                Toast.makeText(requireContext(), "System backend is fixed for this build", Toast.LENGTH_SHORT).show()
+                return@setOnPreferenceClickListener true
             }
+            val intent = android.content.Intent(requireContext(),
+                ai.opencyvis.backend.SetupActivity::class.java)
+            if (name != null && name != "none" && name != "system") {
+                intent.putExtra(
+                    ai.opencyvis.backend.SetupActivity.EXTRA_FORCE_METHOD_CHOOSER,
+                    true
+                )
+            }
+            startActivity(intent)
             true
         }
 

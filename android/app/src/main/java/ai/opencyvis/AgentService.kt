@@ -128,9 +128,13 @@ class AgentService : Service() {
 
     /** Update the backend after pairing/reconnection (called by AdbPairingService). */
     fun updateBackend(newBackend: PrivilegeBackend) {
+        val previousBackend = backend
         backend = newBackend
         ScreenCapture.backend = newBackend
         observeConnectorState(newBackend)
+        if (previousBackend !== newBackend) {
+            previousBackend?.destroy()
+        }
         Log.i(TAG, "Backend updated: ${newBackend.capabilities.name}")
     }
     private var stateObserverJob: Job? = null
@@ -250,10 +254,12 @@ class AgentService : Service() {
                             Log.w(TAG, "Backend disconnected while idle")
                         }
 
-                        // Attempt auto-reconnect
+                        // Shizuku is independent of wireless debugging. Only the direct
+                        // ADB connector should use adb_wifi_enabled as a retry condition.
                         val wirelessOn = SetupStateDetector.isWirelessDebuggingEnabled(this@AgentService)
-                        if (wirelessOn) {
-                            Log.i(TAG, "Wireless debugging still on, attempting auto-reconnect...")
+                        val canRetry = b.connector.name == "shizuku" || wirelessOn
+                        if (canRetry) {
+                            Log.i(TAG, "Attempting ${b.connector.name} backend reconnect...")
                             var reconnected = false
                             for (attempt in 1..5) {
                                 delay(3000L * attempt)
@@ -269,7 +275,7 @@ class AgentService : Service() {
                                 ScreenCapture.backend = SystemBackend()
                             }
                         } else {
-                            Log.i(TAG, "Wireless debugging is off, clearing backend")
+                            Log.i(TAG, "Wireless debugging is off for ADB backend, clearing backend")
                             backend = null
                             ScreenCapture.backend = SystemBackend()
                         }
