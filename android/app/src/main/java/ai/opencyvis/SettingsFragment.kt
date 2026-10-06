@@ -719,6 +719,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val backendName = App.agentService?.activeBackendName
         statusPref.summary = when (backendName) {
             "system"     -> "System App (full capabilities)"
+            "root"       -> "Root (Magisk / KernelSU / APatch) — tap to change"
             "shizuku"    -> "Shizuku — tap to change"
             "adb-direct" -> "ADB Direct — tap to change"
             null, "none" -> "Not connected — tap to set up"
@@ -756,6 +757,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 .setTitle("Revoke Access")
                 .setMessage(
                     "Disconnect the privilege backend.\n\nTo fully revoke:\n" +
+                    "• Root: Revoke superuser access in Magisk / KernelSU / APatch\n" +
                     "• Shizuku: Revoke permission in Shizuku app\n" +
                     "• ADB: Disable wireless debugging in Developer Options"
                 )

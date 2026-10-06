@@ -83,10 +83,12 @@ OpenCyvis is the open-source alternative: you see every line of code, you pick t
 For most users. No custom ROM, no root, no computer.
 
 1. Download and install the APK
-2. Open the app and choose ADB wireless pairing or Shizuku as the privilege backend
+2. Open the app and choose Root, ADB wireless pairing, or Shizuku as the privilege backend
 3. Choose your LLM backend (cloud or local), start using
 
 The built-in ADB wireless pairing flow completes entirely on-device. Alternatively, if [Shizuku](https://shizuku.rikka.app/) is already running, grant OpenCyvis access once and no wireless debugging or pairing is needed. Supports Android 11+.
+
+**Rooted devices (Magisk / KernelSU / APatch):** choose **Use Root** and grant superuser access when your root manager asks (KernelSU / APatch: allow OpenCyvis in the manager's Superuser list first). The privileged service then runs as root — no wireless debugging, Wi-Fi, or Shizuku needed — and reconnects automatically on every launch.
 
 > **ADB wireless pairing tips**
 > - The wizard sends you to **Wireless debugging → Pair device with pairing code**. Once you see the 6-digit code, **pull down the notification shade** and type the code straight into the OpenCyvis notification — no need to switch back to the app.
@@ -101,7 +103,7 @@ Flash an AOSP system image. The app runs as a system application with full platf
 
 ### How they relate
 
-Same AI engine, same LLM backends, same UI, same capabilities. The only difference is how the app obtains system permissions. Standard mode uses ADB shell or Shizuku privileges; System App mode uses platform signing. For everyday tasks, you won't notice the difference.
+Same AI engine, same LLM backends, same UI, same capabilities. The only difference is how the app obtains system permissions. Standard mode uses root, ADB shell, or Shizuku privileges; System App mode uses platform signing. For everyday tasks, you won't notice the difference.
 
 ---
 
@@ -186,7 +188,7 @@ Both install modes share all upper-layer code. The difference is only in the pri
 
 | | SystemBackend | RemoteBackend |
 |---|---|---|
-| Privilege source | Platform signing (uid system) | ADB shell or Shizuku |
+| Privilege source | Platform signing (uid system) | Root (su), ADB shell, or Shizuku |
 | Input injection | InputManager reflection | AIDL proxy to PrivilegedService |
 | Screenshot | SurfaceControl.screenshot() | ImageReader from VD Surface |
 | VD task management | ActivityTaskManager reflection | PrivilegedService proxy |
@@ -224,11 +226,11 @@ Two APKs are available on the [Releases](https://github.com/opencyvis/opencyvis-
 ### Standard Mode (recommended)
 
 1. Download `opencyvis-standard-release.apk` and install
-2. Open the app and choose ADB wireless pairing or Shizuku
+2. Open the app and choose Root, ADB wireless pairing, or Shizuku
 3. Configure your LLM provider in Settings
 4. Start sending tasks
 
-Use the built-in ADB wireless pairing flow by entering the 6-digit code in the OpenCyvis notification and allowing background activity if your ROM prompts for it. Alternatively, if Shizuku is already running, simply grant OpenCyvis access—no wireless pairing is required.
+Use the built-in ADB wireless pairing flow by entering the 6-digit code in the OpenCyvis notification and allowing background activity if your ROM prompts for it. Alternatively, if Shizuku is already running, simply grant OpenCyvis access—no wireless pairing is required. On a rooted device, choose Root and grant superuser access.
 
 ### System App Mode
 

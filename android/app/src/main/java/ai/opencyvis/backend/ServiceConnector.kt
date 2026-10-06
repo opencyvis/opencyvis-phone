@@ -14,6 +14,8 @@ sealed class ConnectionState {
 interface ServiceConnector {
     val name: String
     val state: StateFlow<ConnectionState>
+    /** How long callers should wait for [connect] to reach a terminal state. */
+    val connectTimeoutMs: Long get() = 10_000L
     fun isAvailable(): Boolean
     fun connect()
     fun disconnect()

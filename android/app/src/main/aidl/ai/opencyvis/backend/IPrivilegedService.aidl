@@ -32,4 +32,8 @@ interface IPrivilegedService {
     /** Force-stop a package (shell uid). Used to dismiss split-screen by killing the
         adjacent Settings pane after ADB pairing completes. */
     void forceStopPackage(String packageName);
+
+    /** Release resources and terminate the service process. Used by the root backend,
+        whose process is not owned by an ADB session or the Shizuku server. */
+    oneway void exit();
 }

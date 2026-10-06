@@ -70,4 +70,22 @@
     <string name="setup_action_done">我已完成</string>
     <string name="setup_action_stop">停止</string>
     <string name="setup_open_settings_manual">请手动进入：设置 → 系统 → 开发者选项 → 无线调试</string>
+
+    <!-- Backend method chooser -->
+    <string name="setup_choose_title">选择授权方式</string>
+    <string name="setup_choose_desc_root">检测到设备已 Root（Magisk / KernelSU / APatch）。Root 模式无需无线调试，即可获得完整的系统能力。</string>
+    <string name="setup_choose_desc_shizuku">Shizuku 可用。请选择 OpenCyvis 使用的授权方式。</string>
+    <string name="setup_choose_desc_adb">未检测到 Shizuku，可使用无线调试授权。设备已 Root 时也可选择 Root 模式。</string>
+    <string name="setup_method_root">使用 Root</string>
+    <string name="setup_method_shizuku">使用 Shizuku</string>
+    <string name="setup_method_adb">使用无线调试</string>
+    <string name="setup_method_current">✓ %1$s（当前）</string>
+    <string name="setup_method_other">选择其他方式</string>
+
+    <!-- Root backend -->
+    <string name="setup_root_title">Root 授权</string>
+    <string name="setup_root_checking">正在请求 Root 权限…\n\n如果 Magisk 弹出授权窗口，请点击「允许」。\nKernelSU / APatch 用户请先在管理器的「超级用户」列表中允许 OpenCyvis。</string>
+    <string name="setup_root_success_title">Root 授权成功</string>
+    <string name="setup_root_failed_title">未获得 Root 权限</string>
+    <string name="setup_root_failed_desc">请在 Root 管理器（Magisk / KernelSU / APatch）中允许 OpenCyvis 使用超级用户权限，然后重试。\n\n详情：%1$s</string>
 </resources>

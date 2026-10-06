@@ -2,6 +2,7 @@ package ai.opencyvis.backend
 
 import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -33,8 +34,10 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private enum class SetupState {
-        CHOOSE_METHOD,       // Choose between Shizuku and ADB Direct
+        CHOOSE_METHOD,       // Choose between Root, Shizuku and ADB Direct
         NEED_WIFI,           // WiFi not connected
+        ROOT_CHECK,          // Requesting root (su) and starting the root service
+        ROOT_FAILED,         // su missing, denied, or not allowed in the root manager
         SHIZUKU_CHECK,       // Check if Shizuku is installed and running
         SHIZUKU_PERMISSION,  // Request Shizuku permission
         ADB_CHECK_OS,        // Check Android version for wireless debugging
@@ -46,6 +49,8 @@ class SetupActivity : AppCompatActivity() {
         FAILED               // Something went wrong
     }
 
+    private enum class Method { ROOT, SHIZUKU, ADB }
+
     private lateinit var titleView: TextView
     private lateinit var descView: TextView
     private lateinit var progressBar: ProgressBar
@@ -53,6 +58,7 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var inputField: TextInputEditText
     private lateinit var actionButton: MaterialButton
     private lateinit var secondaryButton: MaterialButton
+    private lateinit var tertiaryButton: MaterialButton
     private lateinit var otpLabel: TextView
     private lateinit var otpBox: OtpDigitBox
     private lateinit var numberPad: NumberPadView
@@ -64,6 +70,12 @@ class SetupActivity : AppCompatActivity() {
     private var resumeAfterCreate = false
     private var pairingPortJob: Job? = null
     private var shizukuConnectJob: Job? = null
+    private var rootConnectJob: Job? = null
+    /** Methods behind the action / secondary / tertiary buttons while choosing. */
+    private var chooserMethods: List<Method> = emptyList()
+    private var connectedVia: String? = null
+    /** Each button's own background / text colors, restored when it leaves the chooser. */
+    private lateinit var defaultButtonColors: Map<MaterialButton, Pair<ColorStateList?, ColorStateList>>
     private var requestedBatteryExemption = false
     private var preferWirelessAdb = false
     private var forceMethodChooser = false
@@ -72,6 +84,8 @@ class SetupActivity : AppCompatActivity() {
         if (!forceMethodChooser &&
             !preferWirelessAdb &&
             currentState != SetupState.SHIZUKU_CHECK &&
+            currentState != SetupState.ROOT_CHECK &&
+            currentState != SetupState.ROOT_FAILED &&
             currentState != SetupState.CONNECTING &&
             currentState != SetupState.ADB_PAIR &&
             currentState != SetupState.CONNECTED
@@ -102,12 +116,16 @@ class SetupActivity : AppCompatActivity() {
         inputField = findViewById(R.id.setup_input)
         actionButton = findViewById(R.id.setup_action_button)
         secondaryButton = findViewById(R.id.setup_secondary_button)
+        tertiaryButton = findViewById(R.id.setup_tertiary_button)
         otpLabel = findViewById(R.id.setup_otp_label)
         otpBox = findViewById(R.id.setup_otp_box)
         numberPad = findViewById(R.id.setup_number_pad)
 
         actionButton.setOnClickListener { onActionClick() }
         secondaryButton.setOnClickListener { onSecondaryClick() }
+        tertiaryButton.setOnClickListener { onTertiaryClick() }
+        defaultButtonColors = listOf(actionButton, secondaryButton, tertiaryButton)
+            .associateWith { it.backgroundTintList to it.textColors }
 
         otpBox.listener = object : OtpDigitBox.OnCodeCompleteListener {
             override fun onCodeComplete(code: String) {
@@ -139,10 +157,23 @@ class SetupActivity : AppCompatActivity() {
         resumeAfterCreate = true
     }
 
-    /** Prefer a running Shizuku before evaluating any wireless ADB prerequisites. */
+    /**
+     * Root the user already picked goes straight to the su flow. Otherwise a rooted
+     * device gets the chooser (picking root triggers the root manager's prompt, so
+     * it should be a deliberate choice). Then prefer a running Shizuku before
+     * evaluating any wireless ADB prerequisites.
+     */
     private fun startPreferredSetupFlow() {
         if (preferWirelessAdb) {
             startAdbSetupFlow()
+            return
+        }
+        if (BackendPreference.get(this) == RootConnector.NAME) {
+            updateUi(SetupState.ROOT_CHECK)
+            return
+        }
+        if (RootConnector.isRootLikely(this)) {
+            updateUi(SetupState.CHOOSE_METHOD)
             return
         }
         when (ShizukuConnector.status()) {
@@ -158,7 +189,7 @@ class SetupActivity : AppCompatActivity() {
         val startState = when (detected) {
             ai.opencyvis.backend.SetupState.NEED_WIFI -> SetupState.NEED_WIFI
             ai.opencyvis.backend.SetupState.UNSUPPORTED_VERSION -> SetupState.ADB_CHECK_OS
-            ai.opencyvis.backend.SetupState.NEED_DEVELOPER_OPTIONS -> SetupState.CHOOSE_METHOD
+            ai.opencyvis.backend.SetupState.NEED_DEVELOPER_OPTIONS -> SetupState.ADB_CHECK_OS
             ai.opencyvis.backend.SetupState.NEED_WIRELESS_DEBUGGING -> SetupState.ADB_ENABLE_WIRELESS
             ai.opencyvis.backend.SetupState.NEED_PAIRING -> {
                 // Wireless debugging is on — try reconnecting with existing keys first
@@ -188,7 +219,14 @@ class SetupActivity : AppCompatActivity() {
             return
         }
 
-        if (forceMethodChooser && currentState == SetupState.CHOOSE_METHOD) return
+        // The chooser waits for the user; root / connect states are driven by their
+        // own jobs (the Magisk grant prompt pauses and resumes this activity).
+        if (currentState == SetupState.CHOOSE_METHOD ||
+            currentState == SetupState.ROOT_CHECK ||
+            currentState == SetupState.ROOT_FAILED ||
+            currentState == SetupState.CONNECTING ||
+            currentState == SetupState.CONNECTED
+        ) return
 
         if (!preferWirelessAdb && ShizukuConnector.status() != ShizukuStatus.UNAVAILABLE) {
             startPreferredSetupFlow()
@@ -200,7 +238,7 @@ class SetupActivity : AppCompatActivity() {
         val newState = when (detected) {
             ai.opencyvis.backend.SetupState.NEED_WIFI -> SetupState.NEED_WIFI
             ai.opencyvis.backend.SetupState.UNSUPPORTED_VERSION -> SetupState.ADB_CHECK_OS
-            ai.opencyvis.backend.SetupState.NEED_DEVELOPER_OPTIONS -> SetupState.CHOOSE_METHOD
+            ai.opencyvis.backend.SetupState.NEED_DEVELOPER_OPTIONS -> SetupState.ADB_CHECK_OS
             ai.opencyvis.backend.SetupState.NEED_WIRELESS_DEBUGGING -> SetupState.ADB_ENABLE_WIRELESS
             ai.opencyvis.backend.SetupState.NEED_PAIRING -> {
                 tryAutoReconnect()
@@ -227,6 +265,11 @@ class SetupActivity : AppCompatActivity() {
         progressBar.visibility = View.GONE
         inputLayout.visibility = View.GONE
         secondaryButton.visibility = View.GONE
+        tertiaryButton.visibility = View.GONE
+        defaultButtonColors.forEach { (button, colors) ->
+            button.backgroundTintList = colors.first
+            button.setTextColor(colors.second)
+        }
         actionButton.isEnabled = true
         // Reset visibility for all states — ADB_PAIR handles them separately
         titleView.visibility = View.VISIBLE
@@ -238,19 +281,67 @@ class SetupActivity : AppCompatActivity() {
 
         when (state) {
             SetupState.CHOOSE_METHOD -> {
-                val shizukuStatus = ShizukuConnector.status()
-                if (shizukuStatus != ShizukuStatus.UNAVAILABLE) {
-                    // Shizuku detected — offer both options
-                    titleView.text = "Choose Backend"
-                    descView.text = "Shizuku is available. Choose which privilege backend OpenCyvis should use."
-                    actionButton.text = "Use Shizuku"
-                    secondaryButton.text = "Use Wireless ADB"
-                    secondaryButton.visibility = View.VISIBLE
-                } else {
-                    titleView.text = "Choose Backend"
-                    descView.text = "Shizuku is not running. Wireless ADB is the available standard-app backend."
-                    actionButton.text = "Use Wireless ADB"
+                val rootLikely = RootConnector.isRootLikely(this)
+                val shizukuPresent = ShizukuConnector.status() != ShizukuStatus.UNAVAILABLE
+                // Most capable first. Root stays offered even when not detected:
+                // KernelSU / APatch hide su from apps that have not been allowed yet.
+                chooserMethods = buildList {
+                    if (rootLikely) add(Method.ROOT)
+                    if (shizukuPresent) add(Method.SHIZUKU)
+                    add(Method.ADB)
+                    if (!rootLikely) add(Method.ROOT)
                 }
+                titleView.text = getString(R.string.setup_choose_title)
+                descView.text = getString(
+                    when {
+                        rootLikely -> R.string.setup_choose_desc_root
+                        shizukuPresent -> R.string.setup_choose_desc_shizuku
+                        else -> R.string.setup_choose_desc_adb
+                    }
+                )
+                val activeMethod = when (ai.opencyvis.App.agentService?.activeBackendName) {
+                    RootConnector.NAME -> Method.ROOT
+                    "shizuku" -> Method.SHIZUKU
+                    "adb-direct" -> Method.ADB
+                    else -> null
+                }
+                // Uniform tonal look for the options, accent for the backend in use.
+                val (tonalTint, tonalText) = defaultButtonColors.getValue(secondaryButton)
+                listOf(actionButton, secondaryButton, tertiaryButton)
+                    .zip(chooserMethods)
+                    .forEach { (button, method) ->
+                        val label = getString(
+                            when (method) {
+                                Method.ROOT -> R.string.setup_method_root
+                                Method.SHIZUKU -> R.string.setup_method_shizuku
+                                Method.ADB -> R.string.setup_method_adb
+                            }
+                        )
+                        if (method == activeMethod) {
+                            button.text = getString(R.string.setup_method_current, label)
+                            button.backgroundTintList =
+                                ColorStateList.valueOf(getColor(R.color.color_accent))
+                            button.setTextColor(getColor(R.color.on_accent))
+                        } else {
+                            button.text = label
+                            button.backgroundTintList = tonalTint
+                            button.setTextColor(tonalText)
+                        }
+                        button.visibility = View.VISIBLE
+                    }
+            }
+            SetupState.ROOT_CHECK -> {
+                titleView.text = getString(R.string.setup_root_title)
+                descView.text = getString(R.string.setup_root_checking)
+                progressBar.visibility = View.VISIBLE
+                actionButton.visibility = View.GONE
+                checkRoot()
+            }
+            SetupState.ROOT_FAILED -> {
+                titleView.text = getString(R.string.setup_root_failed_title)
+                actionButton.text = getString(R.string.setup_action_retry)
+                secondaryButton.text = getString(R.string.setup_method_other)
+                secondaryButton.visibility = View.VISIBLE
             }
             SetupState.NEED_WIFI -> {
                 titleView.text = getString(R.string.setup_need_wifi_title)
@@ -347,7 +438,10 @@ class SetupActivity : AppCompatActivity() {
                 otpBox.isEnabled = false
             }
             SetupState.CONNECTED -> {
-                titleView.text = getString(R.string.setup_success_title)
+                titleView.text = getString(
+                    if (connectedVia == RootConnector.NAME) R.string.setup_root_success_title
+                    else R.string.setup_success_title
+                )
                 descView.text = getString(R.string.setup_success_desc)
                 if (OemHelper.isColorOS()) {
                     descView.append("\n\n" + getString(R.string.setup_coloros_auto_close))
@@ -368,17 +462,9 @@ class SetupActivity : AppCompatActivity() {
 
     private fun onActionClick() {
         when (currentState) {
-            SetupState.CHOOSE_METHOD -> {
-                forceMethodChooser = false
-                when (ShizukuConnector.status()) {
-                    ShizukuStatus.READY -> updateUi(SetupState.SHIZUKU_CHECK)
-                    ShizukuStatus.PERMISSION_REQUIRED -> updateUi(SetupState.SHIZUKU_PERMISSION)
-                    ShizukuStatus.UNAVAILABLE -> {
-                        preferWirelessAdb = true
-                        startAdbSetupFlow()
-                    }
-                }
-            }
+            SetupState.CHOOSE_METHOD -> chooserMethods.getOrNull(0)?.let { chooseMethod(it) }
+            SetupState.ROOT_CHECK -> {}
+            SetupState.ROOT_FAILED -> updateUi(SetupState.ROOT_CHECK)
             SetupState.NEED_WIFI -> {
                 // Re-check WiFi
                 if (SetupStateDetector.hasWifi(this)) {
@@ -417,10 +503,10 @@ class SetupActivity : AppCompatActivity() {
 
     private fun onSecondaryClick() {
         when (currentState) {
-            SetupState.CHOOSE_METHOD -> {
-                forceMethodChooser = false
-                preferWirelessAdb = true
-                updateUi(SetupState.ADB_CHECK_OS)
+            SetupState.CHOOSE_METHOD -> chooserMethods.getOrNull(1)?.let { chooseMethod(it) }
+            SetupState.ROOT_FAILED -> {
+                forceMethodChooser = true
+                updateUi(SetupState.CHOOSE_METHOD)
             }
             SetupState.SHIZUKU_PERMISSION -> {
                 preferWirelessAdb = true
@@ -435,6 +521,61 @@ class SetupActivity : AppCompatActivity() {
                 openWirelessDebuggingSettings()
             }
             else -> {}
+        }
+    }
+
+    private fun onTertiaryClick() {
+        if (currentState == SetupState.CHOOSE_METHOD) {
+            chooserMethods.getOrNull(2)?.let { chooseMethod(it) }
+        }
+    }
+
+    private fun chooseMethod(method: Method) {
+        forceMethodChooser = false
+        when (method) {
+            Method.ROOT -> {
+                preferWirelessAdb = false
+                updateUi(SetupState.ROOT_CHECK)
+            }
+            Method.SHIZUKU -> {
+                preferWirelessAdb = false
+                when (ShizukuConnector.status()) {
+                    ShizukuStatus.READY -> updateUi(SetupState.SHIZUKU_CHECK)
+                    ShizukuStatus.PERMISSION_REQUIRED -> updateUi(SetupState.SHIZUKU_PERMISSION)
+                    ShizukuStatus.UNAVAILABLE -> updateUi(SetupState.CHOOSE_METHOD)
+                }
+            }
+            Method.ADB -> {
+                preferWirelessAdb = true
+                startAdbSetupFlow()
+            }
+        }
+    }
+
+    private fun checkRoot() {
+        if (rootConnectJob?.isActive == true) return
+        rootConnectJob = scope.launch {
+            val connector = RootConnector(this@SetupActivity)
+            connector.connect()
+            val result = try {
+                withTimeoutOrNull(connector.connectTimeoutMs) {
+                    connector.state.first {
+                        it is ConnectionState.Connected || it is ConnectionState.Failed
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                connector.disconnect() // activity gone mid-prompt; don't leave a root process behind
+                throw e
+            }
+            if (result is ConnectionState.Connected) {
+                registerConnectedBackend(connector, result.serviceBinder)
+                updateUi(SetupState.CONNECTED)
+            } else {
+                connector.disconnect()
+                val error = (result as? ConnectionState.Failed)?.error ?: "timed out"
+                updateUi(SetupState.ROOT_FAILED)
+                descView.text = getString(R.string.setup_root_failed_desc, error)
+            }
         }
     }
 
@@ -577,6 +718,8 @@ class SetupActivity : AppCompatActivity() {
             val svc = IPrivilegedService.Stub.asInterface(binder)
             privilegedService = svc
             val backend = RemoteBackend(connector, svc)
+            BackendPreference.set(this, connector.name)
+            connectedVia = connector.name
             ai.opencyvis.capture.ScreenCapture.backend = backend
             ai.opencyvis.App.agentService?.updateBackend(backend)
             Log.i("SetupActivity", "Backend registered with AgentService via ${connector.name}")
@@ -679,14 +822,24 @@ class SetupActivity : AppCompatActivity() {
         }
 
         scope.launch {
+            // Connect wireless ADB specifically. General re-detection would keep whatever
+            // backend is already live (e.g. root), so switching to ADB would silently no-op.
+            val connector = DirectConnector(applicationContext)
+            connector.connect()
             val result = withTimeoutOrNull(15000L) {
-                service.retryBackendDetection()
+                connector.state.first {
+                    it is ConnectionState.Connected ||
+                        it is ConnectionState.Failed ||
+                        it is ConnectionState.NeedsPairing
+                }
             }
-            if (result == true) {
+            if (result is ConnectionState.Connected) {
                 Log.i("SetupActivity", "Auto-reconnect succeeded!")
+                registerConnectedBackend(connector, result.serviceBinder)
                 setResult(RESULT_BACKEND_READY)
                 finish()
             } else {
+                connector.disconnect()
                 Log.i("SetupActivity", "Auto-reconnect failed, showing pairing UI")
                 progressBar.visibility = View.GONE
                 actionButton.isEnabled = true
@@ -742,6 +895,7 @@ class SetupActivity : AppCompatActivity() {
         scope.cancel()
         pairingPortJob?.cancel()
         shizukuConnectJob?.cancel()
+        rootConnectJob?.cancel()
         super.onDestroy()
     }
 }

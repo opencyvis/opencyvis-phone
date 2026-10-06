@@ -60,4 +60,22 @@
     <string name="setup_action_done">I\'m done</string>
     <string name="setup_action_stop">Stop</string>
     <string name="setup_open_settings_manual">Please open Settings → System → Developer options → Wireless debugging manually</string>
+
+    <!-- Backend method chooser -->
+    <string name="setup_choose_title">Choose Backend</string>
+    <string name="setup_choose_desc_root">This device is rooted (Magisk / KernelSU / APatch). Root mode grants full system capabilities without wireless debugging.</string>
+    <string name="setup_choose_desc_shizuku">Shizuku is available. Choose which privilege backend OpenCyvis should use.</string>
+    <string name="setup_choose_desc_adb">Shizuku is not running. Use wireless debugging, or Root mode if this device is rooted.</string>
+    <string name="setup_method_root">Use Root</string>
+    <string name="setup_method_shizuku">Use Shizuku</string>
+    <string name="setup_method_adb">Use Wireless ADB</string>
+    <string name="setup_method_current">✓ %1$s (current)</string>
+    <string name="setup_method_other">Choose another method</string>
+
+    <!-- Root backend -->
+    <string name="setup_root_title">Root Access</string>
+    <string name="setup_root_checking">Requesting root access…\n\nIf Magisk shows a prompt, tap \"Grant\".\nKernelSU / APatch: allow OpenCyvis in the manager\'s Superuser list first.</string>
+    <string name="setup_root_success_title">Root access granted</string>
+    <string name="setup_root_failed_title">Root access not granted</string>
+    <string name="setup_root_failed_desc">Allow OpenCyvis superuser access in your root manager (Magisk / KernelSU / APatch), then retry.\n\nDetails: %1$s</string>
 </resources>

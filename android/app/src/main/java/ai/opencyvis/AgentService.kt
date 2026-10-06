@@ -18,10 +18,12 @@ import android.widget.Toast
 import ai.opencyvis.action.ActionExecutor
 import ai.opencyvis.accessibility.VdAccessibilityService
 import ai.opencyvis.backend.BackendDetector
+import ai.opencyvis.backend.BackendPreference
 import ai.opencyvis.backend.ConnectionState
 import ai.opencyvis.backend.DetectionResult
 import ai.opencyvis.backend.PrivilegeBackend
 import ai.opencyvis.backend.RemoteBackend
+import ai.opencyvis.backend.RootConnector
 import ai.opencyvis.backend.SetupStateDetector
 import ai.opencyvis.backend.SystemBackend
 import ai.opencyvis.capture.ScreenCapture
@@ -53,6 +55,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -113,14 +117,19 @@ class AgentService : Service() {
         private set
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val backendDeferred = CompletableDeferred<PrivilegeBackend>()
+    /** Serializes backend detection: concurrent attempts would stack root grant prompts
+     *  and race each other's binder handshakes. */
+    private val detectionMutex = Mutex()
     private var backend: PrivilegeBackend? = null
 
-    /** The name of the currently active backend (e.g. "system", "shizuku", "adb-direct"), or null. */
+    /** The name of the currently active backend (e.g. "system", "root", "shizuku", "adb-direct"), or null. */
     val activeBackendName: String?
         get() = backend?.capabilities?.name
 
     /** Disconnect the privilege backend. The user can reconnect later from the setup flow. */
     fun revokeBackend() {
+        // Stop watching first: the disconnect below would otherwise trigger auto-reconnect.
+        disconnectObserverJob?.cancel()
         backend?.destroy()
         backend = null
         Log.i(TAG, "Backend revoked by user")
@@ -129,12 +138,18 @@ class AgentService : Service() {
     /** Update the backend after pairing/reconnection (called by AdbPairingService). */
     fun updateBackend(newBackend: PrivilegeBackend) {
         val previousBackend = backend
+        if (previousBackend != null && previousBackend !== newBackend) {
+            // Must run while the old backend is still alive: it owns the VD.
+            releaseSessionForBackendSwitch()
+        }
         backend = newBackend
         ScreenCapture.backend = newBackend
         observeConnectorState(newBackend)
         if (previousBackend !== newBackend) {
             previousBackend?.destroy()
         }
+        // Explicit (setup / pairing) connections become the preferred backend.
+        (newBackend as? RemoteBackend)?.let { BackendPreference.set(this, it.connector.name) }
         Log.i(TAG, "Backend updated: ${newBackend.capabilities.name}")
     }
     private var stateObserverJob: Job? = null
@@ -175,7 +190,7 @@ class AgentService : Service() {
         }
         // Detect privilege backend (async for Shizuku, instant for system app)
         scope.launch {
-            when (val result = BackendDetector.detect(this@AgentService)) {
+            when (val result = detectionMutex.withLock { BackendDetector.detect(this@AgentService) }) {
                 is DetectionResult.Ready -> {
                     backend = result.backend
                     ScreenCapture.backend = result.backend
@@ -254,10 +269,11 @@ class AgentService : Service() {
                             Log.w(TAG, "Backend disconnected while idle")
                         }
 
-                        // Shizuku is independent of wireless debugging. Only the direct
-                        // ADB connector should use adb_wifi_enabled as a retry condition.
+                        // Root and Shizuku are independent of wireless debugging. Only the
+                        // direct ADB connector should use adb_wifi_enabled as a retry condition.
                         val wirelessOn = SetupStateDetector.isWirelessDebuggingEnabled(this@AgentService)
-                        val canRetry = b.connector.name == "shizuku" || wirelessOn
+                        val canRetry = b.connector.name == "shizuku" ||
+                            b.connector.name == RootConnector.NAME || wirelessOn
                         if (canRetry) {
                             Log.i(TAG, "Attempting ${b.connector.name} backend reconnect...")
                             var reconnected = false
@@ -942,7 +958,61 @@ class AgentService : Service() {
         updateNotification("Agent running")
     }
 
-    suspend fun retryBackendDetection(): Boolean {
+    /**
+     * The virtual display (and the app on it) belongs to the previous backend's
+     * privileged process, which exits on switch. Stop an in-flight task and drop the
+     * VD so the next task creates one through the new backend instead of reusing a
+     * display that no longer exists.
+     */
+    private fun releaseSessionForBackendSwitch() {
+        val state = engine?.state?.value
+        val taskActive = state is AgentState.Running || state is AgentState.Paused ||
+            state is AgentState.WaitingForUser || state is AgentState.WaitingForHandoff
+        if (taskActive) {
+            Log.i(TAG, "Backend switched during a task, stopping it")
+            engine?.stop()
+        }
+        val vdm = virtualDisplayManager
+        if (vdm != null) {
+            Log.i(TAG, "Backend switched, releasing virtual display of the previous backend")
+            // Releasing a VD moves its apps to the main display *on top*, covering the
+            // OpenCyvis screen the user switched from. Move them ourselves while the old
+            // backend is alive, then put our own task back in front, then release.
+            val ownTask = try {
+                getSystemService(android.app.ActivityManager::class.java)?.appTasks?.firstOrNull()
+            } catch (_: Exception) { null }
+            if (vdm.isCreated) {
+                val moved = mutableSetOf<Int>()
+                while (moved.size < 10) {
+                    val taskId = vdm.getTopTaskIdOnDisplay(vdm.displayId) ?: break
+                    if (!moved.add(taskId) || !vdm.moveTaskToDisplay(taskId, 0)) break
+                }
+                if (moved.isNotEmpty()) {
+                    try { ownTask?.moveToFront() } catch (e: Exception) {
+                        Log.w(TAG, "Could not bring OpenCyvis back to front: ${e.message}")
+                    }
+                }
+            }
+            vdm.destroy()
+            virtualDisplayManager = null
+        }
+        if (taskActive) stopAgent()  // VD already released; marks the conversation stopped
+    }
+
+    /** Suspends until the startup backend detection finished (it may sit on a root grant prompt). */
+    suspend fun awaitInitialBackendDetection() {
+        backendDeferred.await()
+    }
+
+    private fun hasLiveBackend(): Boolean = when (val b = backend) {
+        null -> false
+        is RemoteBackend -> b.connector.state.value is ConnectionState.Connected
+        else -> true
+    }
+
+    suspend fun retryBackendDetection(): Boolean = detectionMutex.withLock {
+        // The detection we waited behind may have connected already; don't start a second one.
+        if (hasLiveBackend()) return@withLock true
         val result = BackendDetector.detect(this@AgentService)
         if (result is DetectionResult.Ready) {
             backend = result.backend
@@ -952,10 +1022,10 @@ class AgentService : Service() {
             virtualDisplayManager?.destroy()
             virtualDisplayManager = null
             Log.i(TAG, "Backend re-detected: ${result.backend.capabilities.name}")
-            return true
+            return@withLock true
         }
         Log.w(TAG, "Backend re-detection failed: $result")
-        return false
+        false
     }
 
     fun stopAgent() {
