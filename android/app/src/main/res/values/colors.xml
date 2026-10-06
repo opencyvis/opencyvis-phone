@@ -36,6 +36,8 @@
 
     <!-- Brand / Semantic colors (same in both themes) -->
     <color name="color_accent">#FFCBA135</color>
+    <!-- Text on color_accent fills; same in light and dark themes -->
+    <color name="on_accent">#FF1A1A1A</color>
     <color name="color_success">#4ADE80</color>
     <color name="color_danger">#EF4444</color>
     <color name="color_info">#FF2563EB</color>

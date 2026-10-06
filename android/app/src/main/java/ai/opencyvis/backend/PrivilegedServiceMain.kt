@@ -6,9 +6,9 @@ import android.os.Looper
 import android.util.Log
 
 /**
- * Entry point when launched via:
+ * Entry point when launched (as shell via ADB, or as root via su) with:
  *   CLASSPATH=<apk> app_process /system/bin \
- *     ai.opencyvis.backend.PrivilegedServiceMain --token=<token> --authority=<authority>
+ *     ai.opencyvis.backend.PrivilegedServiceMain --token=<token> --authority=<authority> [--user=<id>]
  *
  * Creates PrivilegedService, sends Binder to app via ContentProvider, enters Looper.
  */
@@ -22,6 +22,10 @@ object PrivilegedServiceMain {
 
         val token = args.find { it.startsWith("--token=") }?.substringAfter("=")
         val authority = args.find { it.startsWith("--authority=") }?.substringAfter("=")
+        // The app's user. Defaults to our own, which is wrong for root (always user 0)
+        // when the app runs in a secondary user or work profile.
+        val userId = args.find { it.startsWith("--user=") }?.substringAfter("=")?.toIntOrNull()
+            ?: (android.os.Process.myUid() / 100000)
 
         if (token == null || authority == null) {
             Log.e(TAG, "Missing --token or --authority argument")
@@ -31,26 +35,41 @@ object PrivilegedServiceMain {
         val service = PrivilegedService()
         val binder = service.asBinder()
 
-        try {
-            sendBinderViaHiddenApi(authority, token, binder)
-            Log.i(TAG, "Binder sent to app via getContentProviderExternal, entering Looper")
+        val reply = try {
+            sendBinderViaHiddenApi(authority, token, binder, userId).also {
+                Log.i(TAG, "Binder sent to app via getContentProviderExternal")
+            }
         } catch (e: Exception) {
             Log.w(TAG, "getContentProviderExternal failed, trying ActivityThread fallback", e)
             try {
-                sendBinderViaActivityThread(authority, token, binder)
-                Log.i(TAG, "Binder sent to app via ActivityThread fallback, entering Looper")
+                sendBinderViaActivityThread(authority, token, binder).also {
+                    Log.i(TAG, "Binder sent to app via ActivityThread fallback")
+                }
             } catch (e2: Exception) {
                 Log.e(TAG, "Failed to send binder to app", e2)
                 return
             }
         }
 
-        // Self-terminate when the app dies (prevents orphaned privileged processes)
-        binder.linkToDeath({
-            Log.i(TAG, "App died, exiting privileged service")
+        // Self-terminate when the app dies (prevents orphaned privileged processes).
+        // The app only replies with its token when it accepted our binder, so a
+        // missing token means the exchange was rejected (stale/mismatched token).
+        val appToken = reply?.getBinder("app_token")
+        if (appToken == null) {
+            Log.e(TAG, "Binder exchange rejected by app, exiting")
+            System.exit(1)
+        }
+        try {
+            appToken!!.linkToDeath({
+                Log.i(TAG, "App died, exiting privileged service")
+                System.exit(0)
+            }, 0)
+        } catch (e: android.os.RemoteException) {
+            Log.i(TAG, "App already dead, exiting privileged service")
             System.exit(0)
-        }, 0)
+        }
 
+        Log.i(TAG, "Entering Looper")
         Looper.loop()
     }
 
@@ -58,7 +77,7 @@ object PrivilegedServiceMain {
      * Shizuku's approach: use IActivityManager.getContentProviderExternal() hidden API.
      * This works at shell uid without needing a full Application context.
      */
-    private fun sendBinderViaHiddenApi(authority: String, token: String, binder: IBinder) {
+    private fun sendBinderViaHiddenApi(authority: String, token: String, binder: IBinder, userId: Int): Bundle? {
         val bundle = Bundle().apply {
             putBinder("binder", binder)
             putString("token", token)
@@ -73,7 +92,6 @@ object PrivilegedServiceMain {
             .invoke(null, amBinder)
 
         // IActivityManager.getContentProviderExternal(String name, int userId, IBinder token, String callingTag)
-        val userId = android.os.Process.myUid() / 100000 // UserHandle.getUserId
         val providerHolder = try {
             am.javaClass.getMethod(
                 "getContentProviderExternal",
@@ -97,34 +115,34 @@ object PrivilegedServiceMain {
             Log.d(TAG, "call variant: ${m.parameterTypes.joinToString { it.name }}")
         }
 
+        // Identify as ourselves: shell (2000) under ADB, root (0) under su.
+        // AttributionSource validation accepts any uid when the caller is root.
+        val callingUid = android.os.Process.myUid()
+        val callingPkg = if (callingUid == 2000) "com.android.shell" else null
+
         // Try each call() variant until one works
         var succeeded = false
+        var reply: Bundle? = null
         for (m in callMethods.sortedByDescending { it.parameterCount }) {
             try {
                 val paramTypes = m.parameterTypes
                 when {
                     paramTypes.size >= 5 && paramTypes[0].name.contains("AttributionSource") -> {
-                        val attrSourceClass = paramTypes[0]
-                        val attrSource = attrSourceClass.getConstructor(
-                            Int::class.javaPrimitiveType, String::class.java, String::class.java
-                        ).newInstance(2000, "com.android.shell", null)
-                        m.invoke(provider, attrSource, authority, "exchangeBinder", null, bundle)
+                        val attrSource = newAttributionSource(paramTypes[0], callingUid, callingPkg)
+                        reply = m.invoke(provider, attrSource, authority, "exchangeBinder", null, bundle) as Bundle?
                         succeeded = true
                     }
                     paramTypes.size == 5 && paramTypes[0] == String::class.java -> {
-                        m.invoke(provider, "com.android.shell", authority, "exchangeBinder", null, bundle)
+                        reply = m.invoke(provider, callingPkg, authority, "exchangeBinder", null, bundle) as Bundle?
                         succeeded = true
                     }
                     paramTypes.size == 4 && paramTypes[0].name.contains("AttributionSource") -> {
-                        val attrSourceClass = paramTypes[0]
-                        val attrSource = attrSourceClass.getConstructor(
-                            Int::class.javaPrimitiveType, String::class.java, String::class.java
-                        ).newInstance(2000, "com.android.shell", null)
-                        m.invoke(provider, attrSource, "exchangeBinder", null, bundle)
+                        val attrSource = newAttributionSource(paramTypes[0], callingUid, callingPkg)
+                        reply = m.invoke(provider, attrSource, "exchangeBinder", null, bundle) as Bundle?
                         succeeded = true
                     }
                     paramTypes.size == 4 && paramTypes[0] == String::class.java -> {
-                        m.invoke(provider, "com.android.shell", "exchangeBinder", null, bundle)
+                        reply = m.invoke(provider, callingPkg, "exchangeBinder", null, bundle) as Bundle?
                         succeeded = true
                     }
                 }
@@ -138,9 +156,15 @@ object PrivilegedServiceMain {
             }
         }
         if (!succeeded) throw IllegalStateException("All IContentProvider.call variants failed")
+        return reply
     }
 
-    private fun sendBinderViaActivityThread(authority: String, token: String, binder: IBinder) {
+    private fun newAttributionSource(attrSourceClass: Class<*>, uid: Int, packageName: String?): Any =
+        attrSourceClass.getConstructor(
+            Int::class.javaPrimitiveType, String::class.java, String::class.java
+        ).newInstance(uid, packageName, null)
+
+    private fun sendBinderViaActivityThread(authority: String, token: String, binder: IBinder): Bundle? {
         val bundle = Bundle().apply {
             putBinder("binder", binder)
             putString("token", token)
@@ -149,6 +173,6 @@ object PrivilegedServiceMain {
         val atClass = Class.forName("android.app.ActivityThread")
         val at = atClass.getMethod("systemMain").invoke(null)
         val app = atClass.getMethod("getApplication").invoke(at) as android.app.Application
-        app.contentResolver.call(uri, "exchangeBinder", null, bundle)
+        return app.contentResolver.call(uri, "exchangeBinder", null, bundle)
     }
 }

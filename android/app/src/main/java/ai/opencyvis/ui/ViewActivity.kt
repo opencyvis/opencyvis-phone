@@ -726,9 +726,10 @@ class ViewActivity : AppCompatActivity() {
                 return super.dispatchKeyEvent(event)
             }
             val vdm = agentService?.getVirtualDisplayManager() ?: return super.dispatchKeyEvent(event)
+            val backend = agentService?.getBackend() ?: return super.dispatchKeyEvent(event)
             val displayId = vdm.displayId
             if (displayId != -1) {
-                val result = InputInjector.injectKeyToDisplay(this, event, displayId)
+                val result = InputInjector.injectKeyToDisplay(backend, event, displayId)
                 if (result) return true
             }
         }
@@ -824,11 +825,12 @@ class ViewActivity : AppCompatActivity() {
 
     private fun forwardTouchToVD(event: MotionEvent) {
         val vdm = agentService?.getVirtualDisplayManager() ?: return
+        val backend = agentService?.getBackend() ?: return
         val displayId = vdm.displayId
         if (displayId == -1) return
 
         val injected = MotionEvent.obtain(event)
-        val result = InputInjector.injectToDisplay(this, injected, displayId)
+        val result = InputInjector.injectToDisplay(backend, injected, displayId)
         Log.d(TAG, "Injected touch to display $displayId: result=$result action=${event.action} x=${event.x} y=${event.y}")
         injected.recycle()
     }
@@ -843,16 +845,17 @@ class ViewActivity : AppCompatActivity() {
                 val inserted = s?.subSequence(start, start + count)?.toString().orEmpty()
                 val displayId = agentService?.getVirtualDisplayManager()?.displayId ?: return
                 if (displayId == -1) return
+                val backend = agentService?.getBackend() ?: return
 
                 if (before > count) {
                     repeat(before - count) {
                         InputInjector.injectKeyToDisplay(
-                            this@ViewActivity,
+                            backend,
                             KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL),
                             displayId
                         )
                         InputInjector.injectKeyToDisplay(
-                            this@ViewActivity,
+                            backend,
                             KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL),
                             displayId
                         )
@@ -861,7 +864,7 @@ class ViewActivity : AppCompatActivity() {
                 if (inserted.isNotEmpty()) {
                     Log.i(TAG, "Takeover keyboard proxy forwarding text: ${inserted.length} chars")
                     lifecycleScope.launch {
-                        InputInjector(this@ViewActivity, displayId).typeText(inserted)
+                        InputInjector(this@ViewActivity, displayId, backend = backend).typeText(inserted)
                     }
                 }
             }

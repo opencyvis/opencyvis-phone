@@ -54,30 +54,15 @@ class InputInjector(
          * Inject a MotionEvent to a specific display.
          * Used by ViewActivity for TAKEOVER touch forwarding.
          * Coordinates are 1:1 since VD matches physical display resolution.
+         *
+         * Goes through [backend] so it also works in the standard (non-system)
+         * flavor, where the app itself lacks INJECT_EVENTS and must delegate to
+         * the Shizuku/ADB privileged service.
          */
-        fun injectToDisplay(context: Context, event: MotionEvent, targetDisplayId: Int): Boolean {
+        fun injectToDisplay(backend: PrivilegeBackend, event: MotionEvent, targetDisplayId: Int): Boolean {
             return try {
-                // Get InputManager instance
-                val im = context.getSystemService(Context.INPUT_SERVICE)
-                    ?: Class.forName("android.hardware.input.InputManager")
-                        .getMethod("getInstance").invoke(null)
-                    ?: return false
-
-                // Set displayId on the event
-                try {
-                    event.javaClass.getMethod("setDisplayId", Int::class.javaPrimitiveType)
-                        .invoke(event, targetDisplayId)
-                } catch (_: Exception) {}
-
                 event.source = InputDevice.SOURCE_TOUCHSCREEN
-
-                // Inject
-                val method = im.javaClass.getMethod(
-                    "injectInputEvent",
-                    InputEvent::class.java,
-                    Int::class.javaPrimitiveType
-                )
-                method.invoke(im, event, INJECT_MODE_WAIT_FOR_FINISH) as? Boolean ?: false
+                backend.injectInputEvent(event, targetDisplayId, INJECT_MODE_WAIT_FOR_FINISH)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to inject event to display $targetDisplayId", e)
                 false
@@ -88,26 +73,9 @@ class InputInjector(
          * Inject a KeyEvent to a specific display.
          * Used by ViewActivity in TAKEOVER mode to forward keyboard input to VD.
          */
-        fun injectKeyToDisplay(context: Context, event: KeyEvent, targetDisplayId: Int): Boolean {
+        fun injectKeyToDisplay(backend: PrivilegeBackend, event: KeyEvent, targetDisplayId: Int): Boolean {
             return try {
-                val im = context.getSystemService(Context.INPUT_SERVICE)
-                    ?: Class.forName("android.hardware.input.InputManager")
-                        .getMethod("getInstance").invoke(null)
-                    ?: return false
-
-                // Clone the event and set displayId
-                val clone = KeyEvent(event)
-                try {
-                    clone.javaClass.getMethod("setDisplayId", Int::class.javaPrimitiveType)
-                        .invoke(clone, targetDisplayId)
-                } catch (_: Exception) {}
-
-                val method = im.javaClass.getMethod(
-                    "injectInputEvent",
-                    InputEvent::class.java,
-                    Int::class.javaPrimitiveType
-                )
-                method.invoke(im, clone, INJECT_MODE_WAIT_FOR_FINISH) as? Boolean ?: false
+                backend.injectInputEvent(KeyEvent(event), targetDisplayId, INJECT_MODE_WAIT_FOR_FINISH)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to inject key event to display $targetDisplayId", e)
                 false

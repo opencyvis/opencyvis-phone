@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -19,26 +20,38 @@ class BinderExchangeProvider : ContentProvider() {
     companion object {
         private const val TAG = "BinderExchange"
 
-        @Volatile
-        private var pendingToken: String? = null
-        @Volatile
-        private var receivedBinder: IBinder? = null
-        private var latch = CountDownLatch(1)
+        /** One slot per launch, so concurrent launches (e.g. root + ADB) can't steal each other's binder. */
+        private class Pending {
+            val latch = CountDownLatch(1)
+            @Volatile var binder: IBinder? = null
+        }
+
+        private val pending = ConcurrentHashMap<String, Pending>()
+
+        /**
+         * Lives as long as the app process. Handed back to the privileged process,
+         * which links to its death and exits with the app — nothing else reaps a
+         * root process (no ADB session or Shizuku server owns it).
+         */
+        private val appToken = android.os.Binder()
 
         fun prepare(): String {
             val token = java.util.UUID.randomUUID().toString()
-            pendingToken = token
-            receivedBinder = null
-            latch = CountDownLatch(1)
+            pending[token] = Pending()
             return token
         }
 
-        fun awaitBinder(timeoutMs: Long): IBinder? {
-            latch.await(timeoutMs, TimeUnit.MILLISECONDS)
-            val binder = receivedBinder
-            receivedBinder = null
-            pendingToken = null
-            return binder
+        /** Waits for the binder sent with [token]; the token is single-use either way. */
+        fun awaitBinder(token: String, timeoutMs: Long): IBinder? {
+            val slot = pending[token] ?: return null
+            slot.latch.await(timeoutMs, TimeUnit.MILLISECONDS)
+            pending.remove(token)
+            return slot.binder
+        }
+
+        /** Wake [awaitBinder] early when the launch for [token] has already failed. */
+        fun abort(token: String) {
+            pending[token]?.latch?.countDown()
         }
     }
 
@@ -53,11 +66,12 @@ class BinderExchangeProvider : ContentProvider() {
         }
 
         if (method == "exchangeBinder") {
-            val token = extras?.getString("token")
-            if (token != null && token == pendingToken) {
-                receivedBinder = extras.getBinder("binder")
+            val slot = extras?.getString("token")?.let { pending[it] }
+            if (slot != null) {
+                slot.binder = extras.getBinder("binder")
                 Log.i(TAG, "Binder received (token matched)")
-                latch.countDown()
+                slot.latch.countDown()
+                return Bundle().apply { putBinder("app_token", appToken) }
             } else {
                 Log.w(TAG, "Binder exchange rejected: token mismatch")
             }

@@ -254,7 +254,7 @@ class DirectConnector(private val context: Context) : ServiceConnector {
                 }
             }.start()
 
-            val binder = BinderExchangeProvider.awaitBinder(10_000)
+            val binder = BinderExchangeProvider.awaitBinder(token, 10_000)
             if (binder != null) {
                 binder.linkToDeath({
                     Log.w(TAG, "Privileged service binder died")

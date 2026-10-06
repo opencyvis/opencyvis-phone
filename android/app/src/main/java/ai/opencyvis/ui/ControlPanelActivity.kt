@@ -467,9 +467,15 @@ class ControlPanelActivity : AppCompatActivity() {
     }
 
     private fun checkBackendAndPromptSetup(service: AgentService?) {
-        // Delay check to allow backend detection to complete
+        // Wait for startup detection rather than a fixed delay: root detection can sit on the
+        // root manager's grant prompt, and opening setup on top of it makes the prompt time
+        // out — which Magisk then records as a permanent deny.
         scope.launch {
-            kotlinx.coroutines.delay(3000)
+            if (service != null) {
+                kotlinx.coroutines.withTimeoutOrNull(60_000L) { service.awaitInitialBackendDetection() }
+            } else {
+                kotlinx.coroutines.delay(3000)
+            }
             val backendName = service?.activeBackendName
             if (backendName == null || backendName == "none") {
                 // No backend — launch setup wizard on first run
@@ -817,7 +823,10 @@ class ControlPanelActivity : AppCompatActivity() {
                 val shizukuPresent =
                     ai.opencyvis.backend.ShizukuConnector.status() !=
                         ai.opencyvis.backend.ShizukuStatus.UNAVAILABLE
-                if (shizukuPresent || ai.opencyvis.backend.SetupStateDetector.isWirelessDebuggingEnabled(this)) {
+                if (shizukuPresent ||
+                    ai.opencyvis.backend.BackendDetector.shouldTryRoot(this) ||
+                    ai.opencyvis.backend.SetupStateDetector.isWirelessDebuggingEnabled(this)
+                ) {
                     scope.launch {
                         Log.i(TAG, "A privilege backend is available, retrying detection...")
                         val success = service.retryBackendDetection()

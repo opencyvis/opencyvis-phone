@@ -723,4 +723,12 @@ class PrivilegedService : IPrivilegedService.Stub() {
         releaseVirtualDisplay()
         Log.i(TAG, "PrivilegedService destroyed")
     }
+
+    override fun exit() {
+        checkCaller()
+        Log.i(TAG, "Exit requested by app")
+        releaseVirtualDisplay()
+        // Leave the binder thread before exiting; the oneway call has already returned.
+        Thread { System.exit(0) }.start()
+    }
 }

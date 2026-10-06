@@ -83,10 +83,12 @@ OpenCyvis 是开源替代方案：你能看到每一行代码，你来选 AI 模
 适合大多数用户。不需要刷机，不需要 Root，不需要连接电脑。
 
 1. 下载 APK，正常安装
-2. 打开 App，选择 ADB 无线配对或 Shizuku 作为权限后端
+2. 打开 App，选择 Root、ADB 无线配对或 Shizuku 作为权限后端
 3. 选择 LLM 后端（云端或本地），开始使用
 
 内置的 ADB 无线配对可完全在手机上完成。或者，如果设备上已运行 [Shizuku](https://shizuku.rikka.app/)，授予 OpenCyvis 权限一次即可使用，无需开启无线调试或进行无线配对。支持 Android 11 及以上版本。
+
+**已 Root 的设备（Magisk / KernelSU / APatch）：** 选择「使用 Root」，在 Root 管理器弹窗中授予超级用户权限即可（KernelSU / APatch 需先在管理器的「超级用户」列表中允许 OpenCyvis）。特权服务以 root 身份运行，无需无线调试、WiFi 或 Shizuku，每次启动自动重连。
 
 > **ADB 无线配对小贴士**
 > - 设置向导会引导你打开系统的「无线调试 → 使用配对码配对」。看到 6 位配对码后，**下拉通知栏**，在 OpenCyvis 的通知里直接输入配对码即可——不用切回 App。
@@ -101,7 +103,7 @@ OpenCyvis 是开源替代方案：你能看到每一行代码，你来选 AI 模
 
 ### 两种模式的关系
 
-核心 AI 引擎、LLM 后端、UI 界面、操作能力——两种模式完全一样。差异仅在底层：系统 App 直接调用系统 API，标准模式通过 ADB shell 或 Shizuku 权限获得同等能力。绝大多数日常场景下，用户感受不到区别。
+核心 AI 引擎、LLM 后端、UI 界面、操作能力——两种模式完全一样。差异仅在底层：系统 App 直接调用系统 API，标准模式通过 Root、ADB shell 或 Shizuku 权限获得同等能力。绝大多数日常场景下，用户感受不到区别。
 
 ---
 
@@ -186,7 +188,7 @@ OpenCyvis 不绑定模型。用户自行配置 LLM 后端。
 
 | | SystemBackend | RemoteBackend |
 |---|---|---|
-| 权限来源 | 平台签名（uid system） | ADB shell 或 Shizuku |
+| 权限来源 | 平台签名（uid system） | Root（su）、ADB shell 或 Shizuku |
 | 输入注入 | InputManager 反射 | AIDL 代理到 PrivilegedService |
 | 截屏 | SurfaceControl.screenshot() | ImageReader 从 VD Surface 读取 |
 | VD 任务管理 | ActivityTaskManager 反射 | PrivilegedService 代理 |
@@ -224,11 +226,11 @@ OpenCyvis 不绑定模型。用户自行配置 LLM 后端。
 ### 标准模式（推荐）
 
 1. 下载 `opencyvis-standard-release.apk` 并安装
-2. 打开 App，选择 ADB 无线配对或 Shizuku
+2. 打开 App，选择 Root、ADB 无线配对或 Shizuku
 3. 在设置中配置 LLM Provider
 4. 开始发送任务
 
-使用内置 ADB 无线配对时，下拉通知栏并在 OpenCyvis 通知里输入 6 位配对码；若 ROM 提示允许后台运行，请选择允许。或者，设备上已运行 Shizuku 时，只需授予 OpenCyvis 权限，无需无线配对。
+使用内置 ADB 无线配对时，下拉通知栏并在 OpenCyvis 通知里输入 6 位配对码；若 ROM 提示允许后台运行，请选择允许。或者，设备上已运行 Shizuku 时，只需授予 OpenCyvis 权限，无需无线配对。已 Root 的设备选择「使用 Root」并授予超级用户权限即可。
 
 ### 系统 App 模式
 
